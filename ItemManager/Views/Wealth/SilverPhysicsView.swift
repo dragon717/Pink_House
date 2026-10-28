@@ -5,152 +5,41 @@ import CoreMotion
 
 struct SilverPhysicsView: View {
     let totalWeightGrams: Double
-    let beanWeight: Double // Weight per real bean (e.g. 50g)
+    let beanWeight: Double
 
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.scenePhase) var scenePhase
-    @Environment(\.isSimulationActive) var isSimulationActive
-    @Environment(\.isWealthStorageActive) var isWealthStorageActive
-
-    // Scene Configuration
-    @State private var scene: SilverScene?
-    @State private var isViewVisible: Bool = false
-
-    // Appearance Manager (for background toggle)
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isSimulationActive) private var isSimulationActive
+    @Environment(\.isWealthStorageActive) private var isWealthStorageActive
+    @ObservedObject private var mediaStateManager = MediaStateManager.shared
     private var appearanceManager = WealthAppearanceManager.shared
 
-    // Media State Manager
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-
-    init(totalWeightGrams: Double, beanWeight: Double) {
-        self.totalWeightGrams = totalWeightGrams
-        self.beanWeight = beanWeight
+    private var isActive: Bool {
+        isSimulationActive && isWealthStorageActive && scenePhase == .active && !mediaStateManager.isPhysicsPaused
     }
 
-    // Computed pause state for SpriteView
-    private var shouldPause: Bool {
-        return !isViewVisible || !isSimulationActive || !isWealthStorageActive || scenePhase != .active || mediaStateManager.isPhysicsPaused
-    }
-    
     var body: some View {
         GeometryReader { proxy in
-            let backgroundInfo = getBackgroundInfo(proxySize: proxy.size)
-
+            let customImage = appearanceManager.containerBackgroundImage
+            let layout = WealthContainerLayout(size: proxy.size, customImageSize: customImage?.size)
             ZStack {
-                // Background Image
-                if appearanceManager.shouldShowWealthContainerBackground {
-                    if let image = backgroundInfo.image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: backgroundInfo.isCustom ? .fit : .fill)
-                            .frame(width: backgroundInfo.frame.width, height: backgroundInfo.frame.height)
-                            .position(x: backgroundInfo.frame.midX, y: backgroundInfo.frame.midY)
-                            .clipped()
-                    }
+                if appearanceManager.shouldShowWealthContainerBackground,
+                   let image = customImage ?? UIImage(named: "WealthContainerBackground") {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: customImage == nil ? .fill : .fit)
+                        .frame(width: layout.frame.width, height: layout.frame.height)
+                        .position(x: layout.frame.midX, y: layout.frame.midY)
+                        .clipped()
                 }
-
-                SpriteView(scene: createScene(size: proxy.size, boundary: backgroundInfo.physicsBoundary), isPaused: shouldPause, options: [.allowsTransparency])
-                    .background(Color.clear)
-                    .onAppear {
-                        isViewVisible = true
-                        scene?.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
-
-                        // Update boundary in case it changed
-                        scene?.updateBoundary(backgroundInfo.physicsBoundary)
-                    }
-                    .onChange(of: totalWeightGrams) { _, newValue in
-                        if let scene = scene {
-                            scene.updateBeans(totalWeight: newValue, beanWeight: beanWeight)
-                        }
-                    }
-                    .onChange(of: colorScheme) { _, newScheme in
-                        scene?.updateBackgroundColor(for: newScheme)
-                    }
-                    .onChange(of: shouldPause) { _, newValue in
-                        if newValue {
-                            scene?.pauseSimulation()
-                        } else {
-                            scene?.resumeSimulation()
-                        }
-                    }
-                    .onChange(of: backgroundInfo.physicsBoundary) { _, newBoundary in
-                        scene?.updateBoundary(newBoundary)
-                    }
+                WealthPhysicsSurface(isActive: isActive, makeScene: { SilverScene(size: $0) }) { scene, size in
+                    let boundary = WealthContainerLayout(size: size, customImageSize: customImage?.size)
+                    scene.updateBoundary(boundary.physicsBoundary(in: size))
+                    scene.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
+                }
+                .accessibilityIdentifier("wealth.silver.physics")
             }
+            .clipped()
         }
-        .onAppear {
-            isViewVisible = true
-            // 恢复震动状态
-            HapticEngineManager.shared.resumeHaptics()
-        }
-        .onDisappear {
-            isViewVisible = false
-            // 暂停物理模拟
-            scene?.pauseSimulation()
-            // 停止音效和震动
-            HapticEngineManager.shared.stopHaptics()
-            SoundManager.shared.stopAllSounds()
-            print("🛑 SilverPhysicsView.onDisappear: 物理模拟已暂停")
-        }
-    }
-    
-    private struct BackgroundInfo {
-        let image: UIImage?
-        let isCustom: Bool
-        let frame: CGRect
-        let physicsBoundary: CGRect
-    }
-    
-    private func getBackgroundInfo(proxySize: CGSize) -> BackgroundInfo {
-        if let customBg = appearanceManager.containerBackgroundImage {
-            // Custom Background: Fit mode
-            let widthRatio = proxySize.width / customBg.size.width
-            let heightRatio = proxySize.height / customBg.size.height
-            let scale = min(widthRatio, heightRatio)
-            
-            let width = customBg.size.width * scale
-            let height = customBg.size.height * scale
-            
-            let x = (proxySize.width - width) / 2
-            let y = (proxySize.height - height) / 2
-            
-            let frame = CGRect(x: x, y: y, width: width, height: height)
-            
-            // Convert to SK coordinates (Y-up)
-            let skY = proxySize.height - (y + height)
-            let physicsBoundary = CGRect(x: x, y: skY, width: width, height: height)
-            
-            return BackgroundInfo(image: customBg, isCustom: true, frame: frame, physicsBoundary: physicsBoundary)
-        } else {
-            // Default Background: Fill mode (Full Screen)
-            let frame = CGRect(origin: .zero, size: proxySize)
-            return BackgroundInfo(image: UIImage(named: "WealthContainerBackground"), isCustom: false, frame: frame, physicsBoundary: frame)
-        }
-    }
-    
-    private func createScene(size: CGSize, boundary: CGRect) -> SKScene {
-        if let existingScene = scene {
-            if existingScene.size != size {
-                existingScene.size = size
-            }
-            existingScene.updateBoundary(boundary)
-            return existingScene
-        }
-        
-        let newScene = SilverScene(size: size)
-        newScene.scaleMode = .aspectFill
-        newScene.updateBackgroundColor(for: colorScheme)
-        newScene.updateBoundary(boundary)
-        
-        newScene.updateBeans(totalWeight: totalWeightGrams, beanWeight: beanWeight)
-        
-        DispatchQueue.main.async {
-            if self.scene == nil {
-                self.scene = newScene
-            }
-        }
-        
-        return newScene
     }
 }
 
@@ -164,7 +53,7 @@ struct SilverPhysicsCategory {
     static let beanLayer2: UInt32 = 0b100
 }
 
-class SilverScene: SKScene, SKPhysicsContactDelegate {
+class SilverScene: SKScene, SKPhysicsContactDelegate, WealthPhysicsScene {
     private let motionManager = CMMotionManager()
     private var beanNodes: [SKNode] = []
     
@@ -219,9 +108,14 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
         physicsWorld.gravity = CGVector(dx: 0, dy: -9.8)
         physicsWorld.contactDelegate = self
         
-        startMotionUpdates()
     }
     
+    override func willMove(from view: SKView) {
+        motionManager.stopDeviceMotionUpdates()
+        isPaused = true
+        super.willMove(from: view)
+    }
+
     override func update(_ currentTime: TimeInterval) {
         // 如果场景被暂停，不执行任何更新
         guard !isPaused else { return }
@@ -325,12 +219,7 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
     }
     
     func updateBeans(totalWeight: Double, beanWeight: Double) {
-        guard beanWeight > 0 else { return }
-        
-        let totalRealBeans = Int(totalWeight / beanWeight)
-        let beansToShow = min(totalRealBeans, maxVisualBeans)
-        
-        self.targetBeanCount = beansToShow
+        targetBeanCount = WealthVisualCount.beans(totalWeight: totalWeight, beanWeight: beanWeight, limit: maxVisualBeans)
     }
     
     private func processBeanQueue() {
@@ -422,7 +311,7 @@ class SilverScene: SKScene, SKPhysicsContactDelegate {
     }
     
     private func startMotionUpdates() {
-        guard motionManager.isDeviceMotionAvailable else { return }
+        guard motionManager.isDeviceMotionAvailable, !motionManager.isDeviceMotionActive else { return }
         
         motionManager.deviceMotionUpdateInterval = 0.1
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] (data, error) in

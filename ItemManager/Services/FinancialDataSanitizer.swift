@@ -28,4 +28,9 @@ enum FinancialDataSanitizer {
     static func stock(_ value: Int) -> Int {
         min(max(value, 1), 999)
     }
+
+    /// 衣物单价随数量累加；附属小物已逐条录入，只计算一次。
+    static func orderTotal(unitAmount: Decimal, stock quantity: Int, attachedAmount: Decimal) -> Decimal {
+        money(unitAmount) * Decimal(stock(quantity)) + aggregateMoney(attachedAmount)
+    }
 }

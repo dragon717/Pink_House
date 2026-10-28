@@ -109,7 +109,7 @@ class ClothingSearchService: ObservableObject, Searchable {
                 let colorMatch = clothing.colors.localizedCaseInsensitiveContains(query)
                 let sizeMatch = clothing.sizes.localizedCaseInsensitiveContains(query)
                 let lengthMatch = clothing.length.localizedCaseInsensitiveContains(query)
-                let conditionMatch = clothing.condition.localizedCaseInsensitiveContains(query)
+                let conditionMatch = clothing.physicalCondition.localizedCaseInsensitiveContains(query)
                 let accessoryMatch = clothing.accessories.localizedCaseInsensitiveContains(query)
                 let noteMatch = clothing.note.localizedCaseInsensitiveContains(query)
                 

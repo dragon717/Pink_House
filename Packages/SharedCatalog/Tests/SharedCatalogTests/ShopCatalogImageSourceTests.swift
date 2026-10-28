@@ -43,4 +43,15 @@ final class ShopCatalogImageSourceTests: XCTestCase {
         XCTAssertNotEqual(ShopCatalogImageSource.resolve("cover", asset: { _ in old }),
                           ShopCatalogImageSource.resolve("cover", asset: { _ in new }))
     }
+
+    func testEveryCloudCandidateIsTriedOnceInCanonicalOrder() {
+        let original = String(repeating: "a", count: 64)
+        let preview = String(repeating: "b", count: 64)
+        let thumbnail = String(repeating: "c", count: 64)
+        let asset = CatalogAsset(id: "cover", type: .productImage,
+            thumbnailURL: "thmedia:" + thumbnail, previewURL: "thmedia:" + preview,
+            originalURL: "thmedia:" + original, mediaKey: original)
+        XCTAssertEqual(ShopCatalogImageSource.resolve("cover", asset: { _ in asset }).mediaKeys,
+                       [original, preview, thumbnail])
+    }
 }

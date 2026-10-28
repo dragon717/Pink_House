@@ -14,6 +14,7 @@
 //
 
 import XCTest
+import UIKit
 @testable import ItemManager
 
 // MARK: - 方案一 §2.2：mediaKey
@@ -123,6 +124,7 @@ final class ShopCatalogGzipTests: XCTestCase {
 
 // MARK: - 方案二 §3.1 / §3.3：暂存与改写
 
+@MainActor
 final class ShopCatalogOpsMediaStagingTests: XCTestCase {
 
     override func setUp() {
@@ -135,11 +137,14 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
         super.tearDown()
     }
 
-    /// 写入一个「魔数合法」的假 JPEG（staging 只按魔数判 MIME，不需要真解码）
+    /// 使用可完整解码的图片；超限场景额外填充字节。
     @discardableResult
-    private func writeFakeJPEG(name: String, bytes: Int = 512) throws -> String {
-        var data = Data([0xFF, 0xD8, 0xFF, 0xE0])
-        data.append(Data(repeating: 0x11, count: max(0, bytes - 4)))
+    private func writeJPEG(name: String, bytes: Int = 512) throws -> String {
+        var data = try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 12, height: 9)).image { context in
+            UIColor.systemPink.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 12, height: 9))
+        }.jpegData(compressionQuality: 0.85))
+        data.append(Data(repeating: 0x11, count: max(0, bytes - data.count)))
         let url = ShopCatalogImageStore.directory.appendingPathComponent(name)
         try data.write(to: url)
         return "local:\(name)"
@@ -156,7 +161,7 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
     }
 
     func testPlanDeduplicatesSameContentAndCollectsOwners() throws {
-        let reference = try writeFakeJPEG(name: "img-dup.jpg")
+        let reference = try writeJPEG(name: "img-dup.jpg")
         let plan = try ShopCatalogOpsMediaStaging.plan(for: catalog(with: [reference, reference]))
         XCTAssertEqual(plan.count, 1, "同内容摘要只产生一条待上传媒体")
         XCTAssertGreaterThanOrEqual(plan[0].owners.count, 2, "多处引用都要记下来")
@@ -193,7 +198,7 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
     }
 
     func testPlanThrowsWhenOverByteLimit() throws {
-        let reference = try writeFakeJPEG(
+        let reference = try writeJPEG(
             name: "img-huge.jpg", bytes: ShopCatalogUploadPolicy.maxMediaBytes + 16)
         XCTAssertThrowsError(try ShopCatalogOpsMediaStaging.plan(for: catalog(with: [reference]))) {
             guard case ShopCatalogOpsMediaStagingError.tooLarge = $0 else {
@@ -248,7 +253,7 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
 
     /// 图片齐全时 `diagnose` 必须放行，且不产生任何问题条目。
     func testDiagnosePassesWhenAllFilesArePresent() throws {
-        let reference = try writeFakeJPEG(name: "img-ok.jpg")
+        let reference = try writeJPEG(name: "img-ok.jpg")
         let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog(with: [reference]))
         XCTAssertFalse(diagnosis.isBlocked)
         XCTAssertTrue(diagnosis.issues.isEmpty)
@@ -257,8 +262,11 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
     }
 
     func testRewriteSetsCanonicalMediaKeyAndThmediaReference() throws {
-        let reference = try writeFakeJPEG(name: "img-rewrite.jpg")
-        let original = catalog(with: [reference])
+        let reference = try writeJPEG(name: "img-rewrite.jpg")
+        var original = catalog(with: [reference])
+        original.products = [CatalogProduct(id: "p", shopID: "s", seriesID: "series", name: "帽子",
+            category: "小物", images: ["asset-0", reference])]
+        original.variants = [CatalogProductVariant(id: "v", productID: "p", imageAssetID: reference)]
         let plan = try ShopCatalogOpsMediaStaging.plan(for: original)
         let digest = plan[0].mediaKey
 
@@ -268,6 +276,8 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
         XCTAssertEqual(rewritten.assets[0].mediaKey, digest, "原图摘要要写进 canonical mediaKey")
         XCTAssertEqual(rewritten.assets[0].originalURL, "thmedia:\(digest)")
         XCTAssertEqual(rewritten.sizeCharts[0].sourceImage, "thmedia:\(digest)")
+        XCTAssertEqual(rewritten.products[0].images, ["asset-0", "thmedia:\(digest)"])
+        XCTAssertEqual(rewritten.variants[0].imageAssetID, "thmedia:\(digest)")
         XCTAssertEqual(original.assets[0].mediaKey, nil, "改写不得改动入参（暂存阶段目录原封不动）")
     }
 
@@ -279,6 +289,17 @@ final class ShopCatalogOpsMediaStagingTests: XCTestCase {
         let rewritten = ShopCatalogOpsMediaStaging.rewrite(original, mediaKeys: ["local:x": "hash"])
         XCTAssertEqual(rewritten.shops[0].logo, "bundle:logo.png")
         XCTAssertEqual(rewritten.series[0].cover, "https://example.com/c.jpg")
+    }
+
+    func testRecognizableButBrokenImageCannotBeUploaded() throws {
+        let url = ShopCatalogImageStore.directory.appendingPathComponent("broken.jpg")
+        try Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]).write(to: url)
+        let diagnosis = ShopCatalogOpsMediaStaging.diagnose(for: catalog(with: ["local:broken.jpg"]))
+        XCTAssertTrue(diagnosis.isBlocked)
+        XCTAssertTrue(diagnosis.staged.isEmpty)
+        guard case .invalidImage = diagnosis.issues.first?.reason else {
+            return XCTFail("格式头合法的坏图也必须在上传前被拦下")
+        }
     }
 }
 

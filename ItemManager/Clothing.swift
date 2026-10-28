@@ -47,7 +47,30 @@ enum ClothingStatus: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
 }
 
-enum ClothingReservationKind: String, Codable, CaseIterable, Identifiable {
+/// 衣物成色与购买/预约状态独立。保留 condition 的存储字段，兼容旧备份和 CloudKit。
+enum ClothingCondition: String, CaseIterable, Sendable {
+    case new = "全新"
+    case notNew = "非全新"
+
+    nonisolated static var options: [String] { allCases.map(\.rawValue) }
+
+    nonisolated static func isLegacyPurchaseState(_ value: String) -> Bool {
+        ["待付尾款", "未到货"].contains(value.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    nonisolated static func resolve(_ value: String) -> Self {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 旧版把购买状态覆盖进成色，已无成色信息，沿用创建衣物的默认值。
+        if text.isEmpty || isLegacyPurchaseState(text) ||
+            ["全新", "全新带吊牌", "全新未拆", "未使用"].contains(text) {
+            return .new
+        }
+        // 仅试穿、99新、有瑕疵等历史成色归入非全新；原始描述仍保留在存储字段。
+        return .notNew
+    }
+}
+
+enum ClothingReservationKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case owned = "owned"
     case fullPaymentReservation = "full_payment_reservation"
     case depositPlan = "deposit_plan"
@@ -92,7 +115,7 @@ final class Clothing {
     var colors: String = "" // 逗号分隔
     var sizes: String = "" // 逗号分隔
     var length: String = "" // 长度
-    var condition: String = "全新" // 状态：全新/非全新
+    var condition: String = "全新" // 成色原始值；界面/筛选使用 physicalCondition
     var accessories: String = "" // 逗号分隔，小物
     var imagePaths: [String] = [] // 图片路径列表
     var isShared: Bool = false // 同步到裙装广场
@@ -278,6 +301,20 @@ final class Clothing {
         FinancialDataSanitizer.money(shippingFee)
     }
 
+    var physicalCondition: String {
+        get { ClothingCondition.resolve(condition).rawValue }
+        set { condition = ClothingCondition.resolve(newValue).rawValue }
+    }
+
+    @discardableResult
+    func repairLegacyPurchaseCondition(at date: Date = Date()) -> Bool {
+        guard ClothingCondition.isLegacyPurchaseState(condition) else { return false }
+        condition = physicalCondition
+        updatedAt = date
+        lastModified = date
+        return true
+    }
+
     // 单套总价（含自定义小物，不含一次性邮费）
     var unitTotalPrice: Decimal {
         FinancialDataSanitizer.money(price) + resolvedAccessoriesPrice
@@ -290,26 +327,30 @@ final class Clothing {
             + resolvedShippingFee
     }
 
-    // 总定金 = (裙装定金 + 小物定金总和) * 库存数量
+    private var accessoryDepositTotal: Decimal {
+        accessoryItems?.reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.deposit) } ?? 0
+    }
+
+    private var accessoryBalanceTotal: Decimal {
+        accessoryItems?.reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.balance) } ?? 0
+    }
+
+    // 总定金 = 裙装单件定金 * 库存数量 + 小物定金明细（一次）
     var totalDeposit: Decimal {
-        let accDeposit = accessoryItems?.reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.deposit) } ?? 0
-        return (FinancialDataSanitizer.money(deposit) + accDeposit)
-            * Decimal(FinancialDataSanitizer.stock(stock))
+        FinancialDataSanitizer.orderTotal(unitAmount: deposit, stock: stock,
+                                         attachedAmount: accessoryDepositTotal)
     }
     
-    // 总尾款 = (裙装尾款 + 小物尾款总和) * 库存数量
+    // 总尾款 = 裙装单件尾款 * 库存数量 + 小物尾款明细（一次）
     var totalBalance: Decimal {
-        let accBalance = accessoryItems?.reduce(Decimal(0)) { $0 + FinancialDataSanitizer.money($1.balance) } ?? 0
-        let storedBalance = (FinancialDataSanitizer.money(balance) + accBalance)
-            * Decimal(FinancialDataSanitizer.stock(stock))
+        let storedBalance = FinancialDataSanitizer.orderTotal(
+            unitAmount: balance, stock: stock, attachedAmount: accessoryBalanceTotal)
         if storedBalance > 0 {
             return storedBalance
         }
 
-        let conditionText = condition.trimmingCharacters(in: .whitespacesAndNewlines)
         guard isDepositPlan,
-              !isFullPaymentReservation,
-              conditionText == "待付尾款" else {
+              !isFullPaymentReservation else {
             return 0
         }
         return inventoryTotalPrice
@@ -351,10 +392,7 @@ final class Clothing {
 
     var fullPaymentReservationTotalAmount: Decimal {
         guard isFullPaymentReservation else { return 0 }
-        let accessoryBalance = accessoryItems?.reduce(Decimal(0)) {
-            $0 + FinancialDataSanitizer.money($1.balance)
-        } ?? 0
-        return totalDeposit + accessoryBalance * Decimal(stock)
+        return totalDeposit + accessoryBalanceTotal
     }
 
     var pendingFinalPaymentAmount: Decimal {
@@ -412,8 +450,8 @@ final class Clothing {
 }
 
 extension Clothing {
-    /// Wardrobe list/stats summary values must not fault the accessory relationship for every row.
-    /// `accessoriesPrice` is maintained by edit/validation flows and is the list-scale source.
+    /// 列表与详情共用金额口径。列表/小组件查询批量预取小物，避免逐行查询。
+    /// `accessoriesPrice` 仍作为完整售价的汇总缓存；定金/尾款读取对应明细。
     var wardrobeListInventoryTotalPrice: Decimal {
         (FinancialDataSanitizer.money(price) * Decimal(FinancialDataSanitizer.stock(stock)))
             + FinancialDataSanitizer.money(accessoriesPrice)
@@ -421,26 +459,15 @@ extension Clothing {
     }
 
     var wardrobeListTotalDeposit: Decimal {
-        FinancialDataSanitizer.money(deposit) * Decimal(FinancialDataSanitizer.stock(stock))
+        totalDeposit
     }
 
     var wardrobeListTotalBalance: Decimal {
-        let storedBalance = FinancialDataSanitizer.money(balance) * Decimal(FinancialDataSanitizer.stock(stock))
-        if storedBalance > 0 {
-            return storedBalance
-        }
-
-        let conditionText = condition.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isDepositPlan,
-              !isFullPaymentReservation,
-              conditionText == "待付尾款" else {
-            return 0
-        }
-        return wardrobeListInventoryTotalPrice
+        totalBalance
     }
 
     var wardrobeListFullPaymentReservationTotalAmount: Decimal {
-        isFullPaymentReservation ? wardrobeListTotalDeposit : 0
+        fullPaymentReservationTotalAmount
     }
 
     var wardrobeListValueAmount: Decimal {
@@ -526,6 +553,26 @@ final class WealthSavingEntry {
         set { entryKind = newValue.rawValue }
     }
 
+}
+
+enum ClothingConditionRepair {
+    /// 可重复执行，覆盖启动时已有记录以及稍后由 iCloud 同步回来的旧记录。
+    @MainActor
+    @discardableResult
+    static func repair(context: ModelContext, at date: Date = Date()) -> Int {
+        do {
+            let items = try context.fetch(FetchDescriptor<Clothing>(
+                predicate: #Predicate { !$0.isDeleted && $0.deletedAt == nil }
+            ))
+            let changed = items.filter { $0.repairLegacyPurchaseCondition(at: date) }
+            guard !changed.isEmpty else { return 0 }
+            try context.save()
+            return changed.count
+        } catch {
+            print("ClothingConditionRepair: Failed to repair legacy conditions: \(error)")
+            return 0
+        }
+    }
 }
 
 enum WealthSavingLedger {
@@ -832,6 +879,7 @@ enum WealthSavingLedger {
     }
 
     static func markFinalPaymentCompleted(_ clothing: Clothing, at date: Date) {
+        clothing.repairLegacyPurchaseCondition(at: date)
         clothing.isDepositPlan = false
         clothing.isFinalPaymentSavedToWealth = false
         clothing.finalPaymentSavedAt = nil

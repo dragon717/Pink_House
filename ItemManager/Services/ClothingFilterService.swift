@@ -143,9 +143,9 @@ class ClothingFilterService {
         if selectedConditions.isEmpty {
             return true
         } else if selectedConditions.contains(noConditionMarker) {
-            return clothing.condition.isEmpty
+            return clothing.physicalCondition.isEmpty
         } else {
-            return !selectedConditions.isDisjoint(with: splitValues(clothing.condition))
+            return !selectedConditions.isDisjoint(with: splitValues(clothing.physicalCondition))
         }
     }
     
@@ -160,18 +160,13 @@ class ClothingFilterService {
     }
     
     private static func matchesDepositStatus(_ clothing: Clothing, filter: DepositStatusFilter) -> Bool {
-        switch filter {
-        case .all:
-            return true
-        case .owned:
-            return clothing.reservationKind == .owned
-        case .fullPaymentReservation:
-            return clothing.isFullPaymentReservation
-        case .depositPlan:
-            return clothing.isFinalPaymentPlan
-        case .sold:
-            return clothing.reservationKind == .sold
-        }
+        filter.includes(clothing.reservationKind)
+    }
+
+    /// 异步筛选结果与编辑缓存显示前必须按当前状态再收窄，不能短暂露出旧状态记录。
+    static func filterByDepositStatus(_ clothings: [Clothing], filter: DepositStatusFilter) -> [Clothing] {
+        guard filter != .all else { return clothings }
+        return clothings.filter { matchesDepositStatus($0, filter: filter) }
     }
     
     // MARK: - 工具方法

@@ -44,7 +44,7 @@ class SuggestionManager {
         case .accessory:
             return ["KC", "发带", "BNT", "扁帽", "发卡", "边夹", "手袖", "腕饰", "项链", "戒指", "胸针", "包", "袜子", "过膝袜", "连裤袜", "手套", "遮阳伞", "扇子"]
         case .condition:
-            return ["全新", "仅试穿", "99新", "95新", "9成新", "有瑕疵", "战斗成色", "未到货", "待付尾款"]
+            return ClothingCondition.options
         }
     }
 
@@ -103,7 +103,7 @@ class SuggestionManager {
                 parseTags(clothing.accessories, into: &accessories)
                 
                 if !clothing.condition.isEmpty {
-                    conditions.insert(clothing.condition)
+                    conditions.insert(clothing.physicalCondition)
                 }
             }
             
@@ -149,6 +149,9 @@ class SuggestionManager {
     // 搜索建议
     func getSuggestions(for field: SuggestionField, query: String) -> [String] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if field == .condition {
+            return ClothingCondition.options.filter { $0.localizedCaseInsensitiveContains(trimmedQuery) }
+        }
         guard !trimmedQuery.isEmpty else { return [] }
         
         return queue.sync {
@@ -265,7 +268,7 @@ class SuggestionManager {
     }
 
     func getAllConditions() -> [String] {
-        queue.sync { tries[.condition]?.getAllWords() ?? [] }
+        ClothingCondition.options
     }
     
     func getAllLengths() -> [String] {

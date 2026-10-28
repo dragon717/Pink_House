@@ -58,8 +58,8 @@ class WardrobeContextManager {
 
         // 3. 心愿尾款统计
         let depositPlans = clothings.filter { $0.isFinalPaymentPlan }
-        let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + ($1.deposit * Decimal($1.stock)) }
-        let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + ($1.balance * Decimal($1.stock)) }
+        let totalDeposit = depositPlans.reduce(Decimal(0)) { $0 + $1.reservationPaidAmount }
+        let totalBalance = depositPlans.reduce(Decimal(0)) { $0 + $1.pendingFinalPaymentAmount }
 
         // 构建 Context String
         var summary = """
@@ -586,8 +586,8 @@ class WardrobeContextManager {
         if !clothing.length.isEmpty {
             features.append("衣长:\(clothing.length)")
         }
-        if !clothing.condition.isEmpty {
-            features.append("状态:\(clothing.condition)")
+        if !clothing.physicalCondition.isEmpty {
+            features.append("状况:\(clothing.physicalCondition)")
         }
         
         if clothing.isFinalPaymentPlan {

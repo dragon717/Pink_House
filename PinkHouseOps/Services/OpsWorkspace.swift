@@ -1253,7 +1253,8 @@ final class OpsWorkspace: ObservableObject {
             strict: strict,
             strictScope: strictScope,
             verifiedRemoteMediaKeys: verifiedRemoteMediaKeys,
-            targetEnvironmentName: targetEnvironmentName)
+            targetEnvironmentName: targetEnvironmentName,
+            stagedBytes: { try? Data(contentsOf: self.stagingDirectory.appendingPathComponent($0)) })
     }
 
     /// 校验当前快照，返回是否阻断 —— 供「服务入口复校验」用。

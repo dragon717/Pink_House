@@ -105,7 +105,10 @@ struct DepositPlanView: View {
         // 后续用 isFinalPaymentPlan 收窄为真正的定金尾款。
         let filter = #Predicate<Clothing> { $0.isDepositPlan == true && $0.deletedAt == nil }
         // Use default sort since we'll apply sorting manually in updateBaseClothings
-        _depositClothings = Query(filter: filter, sort: \Clothing.createdAt, order: .reverse)
+        var descriptor = FetchDescriptor<Clothing>(predicate: filter,
+            sortBy: [SortDescriptor(\Clothing.createdAt, order: .reverse)])
+        descriptor.relationshipKeyPathsForPrefetching = [\Clothing.accessoryItems]
+        _depositClothings = Query(descriptor)
         
         self.selectedTagIDs = selectedTagIDs
         self.selectedBrandIDs = selectedBrandIDs
@@ -130,7 +133,7 @@ struct DepositPlanView: View {
                     clothing.isFinalPaymentPlan ? "final" : "non-final",
                     clothing.reservationKind.rawValue,
                     clothing.name,
-                    clothing.condition,
+                    clothing.physicalCondition,
                     String(clothing.stock),
                     Self.decimalToken(clothing.deposit),
                     Self.decimalToken(clothing.balance),
@@ -170,32 +173,19 @@ struct DepositPlanView: View {
         value.map { String($0.timeIntervalSince1970) } ?? "nil"
     }
 
-    private func refreshDepositData(reanalyzeSeries: Bool) {
-        updateBaseClothings()
-        if reanalyzeSeries {
-            analyzeSeries()
-        }
-    }
-
     private func handleInitialLoad() {
         updateBaseClothings()
-        if viewMode == .series && seriesList.isEmpty {
-            analyzeSeries()
-        }
     }
 
     private func handleDepositDataChanged() {
-        refreshDepositData(reanalyzeSeries: viewMode == .series)
+        updateBaseClothings()
     }
 
     private func handleYearChanged() {
-        updateBaseClothings()
-        if viewMode == .series {
-            analyzeSeries()
-        }
         // Clear selections when year changes to avoid confusion
         selectedMonths.removeAll()
         selectedSeries.removeAll()
+        updateBaseClothings()
     }
 
     private func handleDisappear() {
@@ -277,6 +267,8 @@ struct DepositPlanView: View {
         self.monthSelectorSummary = DepositMonthSelectorSummary(clothings: sortedResult)
         self.recentAddedStats = DepositRecentAddedStats(clothings: sortedResult)
         updateFilteredClothings()
+        // 搜索、筛选和模型变化都必须刷新系列，不能复用上一份基准的汇总。
+        if viewMode == .series { analyzeSeries() }
     }
     
     private func updateFilteredClothings() {
@@ -284,6 +276,8 @@ struct DepositPlanView: View {
         let collapsedRecentMonth = monthSelectorSummary.recentMonth
         let selectedMonthsForFilter = selectedMonths
         let selectedSeriesForFilter = selectedSeries
+        let selectedClothingIDs = Set(seriesList.filter { selectedSeriesForFilter.contains($0.name) }
+            .flatMap(\.clothingIDs))
         let isMonthlyMode = viewMode == .monthly
         let isMonthExpanded = isMonthSelectorExpanded
         let isSeriesExpanded = isSeriesSelectorExpanded
@@ -318,11 +312,7 @@ struct DepositPlanView: View {
                     return true
                 } else {
                     // 有选中系列时，只显示选中的系列
-                    return selectedSeriesForFilter.contains { seriesPrefix in
-                        let sanitizedName = SeriesAnalyzer.shared.sanitize(clothing.name).lowercased()
-                        let prefix = seriesPrefix.lowercased()
-                        return sanitizedName.hasPrefix(prefix)
-                    }
+                    return selectedClothingIDs.contains(clothing.id)
                 }
             }
         }
@@ -348,7 +338,8 @@ struct DepositPlanView: View {
         .padding(.horizontal)
         .onChange(of: viewMode) { oldValue, newValue in
             updateFilteredClothings()
-            if newValue == .series && seriesList.isEmpty {
+            // 按月页可能已修改过金额；每次进入系列页都取当前快照。
+            if newValue == .series {
                 analyzeSeries()
             }
         }

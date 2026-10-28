@@ -24,8 +24,9 @@ struct ShopCatalogWardrobeMergeView: View {
     var colorByProduct: [String: String] = [:]
     /// 各单品选定的尺码（系列点菜页传入；缺省不写尺码）
     var sizeByProduct: [String: String] = [:]
-    /// 完成后的提示文案回传（由系列页展示 toast）
+    /// 保存成功后通知调用方刷新勾选；成功反馈由统一入橱服务展示。
     var onFinished: (Int) -> Void
+    let saveIndividually: Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -34,12 +35,14 @@ struct ShopCatalogWardrobeMergeView: View {
 
     init(selectedProductIDs: [String], priceChoices: [String: ShopCatalogCardPriceChoice] = [:],
          colorByProduct: [String: String] = [:], sizeByProduct: [String: String] = [:],
-         store: ShopCatalogStore = .shared, onFinished: @escaping (Int) -> Void) {
+         store: ShopCatalogStore = .shared, saveIndividually: Bool = false,
+         onFinished: @escaping (Int) -> Void) {
         self.selectedProductIDs = selectedProductIDs
         self.priceChoices = priceChoices
         self.colorByProduct = colorByProduct
         self.sizeByProduct = sizeByProduct
         self.onFinished = onFinished
+        self.saveIndividually = saveIndividually
         _store = ObservedObject(wrappedValue: store)
     }
 
@@ -135,6 +138,7 @@ struct ShopCatalogWardrobeMergeView: View {
     }
 
     private var includedItems: [(product: CatalogProduct, price: Decimal?)] {
+        if saveIndividually { return items }
         let ids = Set(selection.includedProducts(in: items.map(\.product)).map(\.id))
         return items.filter { ids.contains($0.product.id) }
     }
@@ -149,16 +153,28 @@ struct ShopCatalogWardrobeMergeView: View {
 
     var body: some View {
         confirmationContent
+        .safeAreaInset(edge: .bottom) {
+            if saveIndividually {
+                VStack(spacing: 12) {
+                    totalSection
+                    confirmButton
+                }
+                .padding(16)
+                .background(.ultraThinMaterial)
+            }
+        }
         .background(
             LiquidBackground(themeSkinWallpaperContext: .timeHall)
                 .ignoresSafeArea()
         )
         .interactiveDismissDisabled(isInserting)
         .disabled(isInserting)
-        .navigationTitle("加入少女衣橱")
+        .navigationTitle((saveIndividually ? "逐件加入衣橱" : "加入少女衣橱").appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Button("取消") { dismiss() } }
+            ToolbarItem(placement: .topBarLeading) {
+                Button("取消") { dismiss() }.disabled(isInserting)
+            }
         }
         .alert("无法加入衣橱", isPresented: Binding(
             get: { errorText != nil },
@@ -185,18 +201,20 @@ struct ShopCatalogWardrobeMergeView: View {
                 selectedSection
                 entryChoiceSection
                 reservationBatchSection
-                primarySection
-                if !accessoryCandidates.isEmpty {
-                    accessorySection
+                if saveIndividually {
+                    Text("选好后一次确认，每件商品分别保存为独立衣物，小物也单独入橱。".appLocalized)
+                        .font(.footnote)
+                        .foregroundStyle(themeManager.secondaryTextColor)
+                } else {
+                    primarySection
+                    if !accessoryCandidates.isEmpty { accessorySection }
+                    if primaryItems.count > 1 { splitNotice }
                 }
-                if primaryItems.count > 1 {
-                    splitNotice
-                }
-                totalSection
+                if !saveIndividually { totalSection }
                 TextField("备注（选填，写下你想记录的内容）", text: $userNote, axis: .vertical)
                     .padding(14)
                     .themeSkinSectionCard(cornerRadius: 16)
-                confirmButton
+                if !saveIndividually { confirmButton }
             }
             .padding(16)
             .padding(.bottom, 24)
@@ -425,7 +443,7 @@ struct ShopCatalogWardrobeMergeView: View {
 
     private var totalSection: some View {
         HStack {
-            Text("本套实际入手".appLocalized)
+            Text((saveIndividually ? "所选商品合计" : "本套实际入手").appLocalized)
                 .font(.system(size: 14))
                 .foregroundStyle(themeManager.secondaryTextColor)
             Spacer()
@@ -444,7 +462,7 @@ struct ShopCatalogWardrobeMergeView: View {
                 if isInserting {
                     ProgressView().tint(.white).padding(.vertical, 14)
                 } else {
-                    Text("确认加入衣橱".appLocalized)
+                    Text((saveIndividually ? "一键逐件加入衣橱" : "确认加入衣橱").appLocalized)
                         .font(.system(size: 16, weight: .semibold))
                         .padding(.vertical, 14)
                 }
@@ -473,7 +491,7 @@ struct ShopCatalogWardrobeMergeView: View {
             errorText = "请先选择主衣物"
             return
         }
-        let keptAccessoryIDs = selection.includedAccessoryIDs
+        let keptAccessoryIDs: Set<String> = saveIndividually ? [] : selection.includedAccessoryIDs
         if needsPurchaseBatchSelection {
             errorText = "请选择购买的团次或批次"
             return
@@ -512,12 +530,12 @@ struct ShopCatalogWardrobeMergeView: View {
             )
         }
         do {
-            let pairs = try ShopCatalogWardrobeDraftBuilder.makeSplitDrafts(
-                selections: selections,
-                accessoryProductIDs: keptAccessoryIDs,
-                store: store,
-                primaryProductID: selection.primaryID
-            )
+            let pairs = try saveIndividually
+                ? ShopCatalogWardrobeIndividualAddition(productIDs: selectedProductIDs)
+                    .makeDrafts(selections: selections, store: store)
+                : ShopCatalogWardrobeDraftBuilder.makeSplitDrafts(
+                    selections: selections, accessoryProductIDs: keptAccessoryIDs,
+                    store: store, primaryProductID: selection.primaryID)
             _ = try await ShopCatalogWardrobeAddition.addSet(
                 drafts: pairs.map { (draft: $0.draft.with(note: userNote), selection: $0.selection) },
                 accessoryProductIDs: keptAccessoryIDs,

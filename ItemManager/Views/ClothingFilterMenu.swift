@@ -351,7 +351,7 @@ struct ClothingFilterMenu: View {
             }
             
         case .condition:
-            // 状态筛选需要特殊处理"无状态"选项
+            // 状态筛选需要特殊处理"无状况"选项
             Menu {
                 Button(role: .destructive) {
                     selectedConditions.removeAll()
@@ -359,24 +359,7 @@ struct ClothingFilterMenu: View {
                     Label("清除筛选".appLocalized, systemImage: "xmark.circle")
                 }
                 
-                // 无状态选项
-                Button {
-                    if selectedConditions.contains(ClothingFilterMenu.noConditionMarker) {
-                        selectedConditions.remove(ClothingFilterMenu.noConditionMarker)
-                    } else {
-                        selectedConditions.removeAll()
-                        selectedConditions.insert(ClothingFilterMenu.noConditionMarker)
-                    }
-                } label: {
-                    HStack {
-                        Text("无状态".appLocalized)
-                        if selectedConditions.contains(ClothingFilterMenu.noConditionMarker) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                
-                ForEach(getAllValues(for: \.condition), id: \.self) { condition in
+                ForEach(ClothingCondition.options, id: \.self) { condition in
                     Button {
                         if selectedConditions.contains(condition) {
                             selectedConditions.remove(condition)
@@ -395,9 +378,9 @@ struct ClothingFilterMenu: View {
                 }
             } label: {
                 let selectedConditionName: String? = selectedConditions.first.flatMap { condition in
-                    condition == ClothingFilterMenu.noConditionMarker ? "无状态".appLocalized : condition
+                    condition == ClothingFilterMenu.noConditionMarker ? "无状况".appLocalized : condition
                 }
-                Label(selectedConditionName ?? "状态".appLocalized, systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
+                Label(selectedConditionName ?? "状况".appLocalized, systemImage: selectedConditions.isEmpty ? "star" : "star.fill")
             }
             
         case .accessories:

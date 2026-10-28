@@ -130,7 +130,7 @@ struct OverviewStatsCard: View {
     
     var accessoriesValue: Decimal {
         clothings.reduce(0) { total, clothing in
-            let attachedValue = clothing.accessoriesPrice * Decimal(clothing.stock)
+            let attachedValue = clothing.resolvedAccessoriesPrice
             let selfValue = clothing.types.contains("小物") ? (clothing.price * Decimal(clothing.stock)) : 0
             return total + attachedValue + selfValue
         }

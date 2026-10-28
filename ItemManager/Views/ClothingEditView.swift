@@ -1184,7 +1184,6 @@ struct ClothingEditView: View {
     private var initialTypes: Set<String>?
     private var onSaved: ((Clothing) -> Void)?
     @State private var originalReservationKind: ClothingReservationKind = .owned
-    @State private var originalCondition: String = ""
 
     init(
         clothing: Clothing?,
@@ -1641,9 +1640,8 @@ struct ClothingEditView: View {
                 isSaving = false
             }
             Button("确认保存".appLocalized) {
-                let targetCondition = pendingOwnedToReservationKind.conditionWhenSwitchingFromOwned
                 pendingOwnedToReservationKind = .owned
-                performSave(enforcedCondition: targetCondition)
+                performSave()
             }
         } message: {
             Text(ownedToReservationConfirmationMessage)
@@ -1773,8 +1771,6 @@ struct ClothingEditView: View {
 
     // MARK: - Helpers
 
-    private static let ownedTransitionConditionTexts: Set<String> = ["未到货", "待付尾款"]
-
     private var shouldKeepCreateDraft: Bool {
         hasMeaningfulData() || hasUserTouchedAnyField
     }
@@ -1790,7 +1786,6 @@ struct ClothingEditView: View {
 
     private var ownedToReservationConfirmationMessage: String {
         let targetKind = pendingOwnedToReservationKind
-        let targetStatus = targetKind.conditionWhenSwitchingFromOwned ?? ""
         let detailHint: String
         switch targetKind {
         case .owned:
@@ -1803,9 +1798,8 @@ struct ClothingEditView: View {
             detailHint = ""
         }
 
-        return "保存后会把这条裙装从「已拥有」切换为「%@」，并将裙装状态改为「%@」。%@".appLocalized(
+        return "保存后会把这条裙装从「已拥有」切换为「%@」。%@".appLocalized(
             targetKind.displayName.appLocalized,
-            targetStatus.appLocalized,
             detailHint
         )
     }
@@ -1839,10 +1833,10 @@ struct ClothingEditView: View {
         return true
     }
 
-    private func performSave(enforcedCondition: String? = nil) {
+    private func performSave() {
         cancelPendingDraftPersistence()
         isSaving = true
-        if save(enforcedCondition: enforcedCondition) {
+        if save() {
             clearCurrentDraftStorage()
         } else {
             isSaving = false
@@ -2003,14 +1997,13 @@ struct ClothingEditView: View {
 
     private func loadFromClothing(_ c: Clothing) {
         originalReservationKind = c.reservationKind
-        originalCondition = c.condition
         name = c.name
         brandName = c.brand?.name ?? ""
         types = c.types
         colors = c.colors
         sizes = c.sizes
         length = c.length
-        condition = c.condition
+        condition = c.physicalCondition
         accessories = c.accessories
         imagePaths = c.imagePaths
         isShared = c.isShared
@@ -2180,7 +2173,7 @@ struct ClothingEditView: View {
         colors = draft.colors
         sizes = draft.sizes
         length = draft.length
-        condition = draft.condition
+        condition = ClothingCondition.resolve(draft.condition).rawValue
         accessories = draft.accessories
         // 恢复图片引用 - 草稿中的图片应该被完全恢复
         // 注意：这里直接赋值，不需要条件判断，因为草稿恢复应该恢复所有保存的状态
@@ -2493,18 +2486,6 @@ struct ClothingEditView: View {
         return deposit > 0 && balance == 0 ? .fullPaymentReservation : .depositPlan
     }
 
-    private func normalizedConditionText(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var canAutoFillOwnedTransitionCondition: Bool {
-        let current = normalizedConditionText(condition)
-        let original = normalizedConditionText(originalCondition)
-        return current.isEmpty ||
-            current == original ||
-            Self.ownedTransitionConditionTexts.contains(current)
-    }
-
     private func applyReservationKindChange(from oldValue: ClothingReservationKind, to newValue: ClothingReservationKind) {
         isDepositPlan = newValue == .fullPaymentReservation || newValue == .depositPlan
         // Preserve in-progress price input while users compare reservation tabs.
@@ -2515,17 +2496,6 @@ struct ClothingEditView: View {
             return
         }
 
-        if newValue == .owned {
-            if Self.ownedTransitionConditionTexts.contains(normalizedConditionText(condition)) {
-                condition = originalCondition
-            }
-            return
-        }
-
-        if let targetCondition = newValue.conditionWhenSwitchingFromOwned,
-           canAutoFillOwnedTransitionCondition {
-            condition = targetCondition
-        }
         if newValue == .depositPlan, sanitizedMoneyDouble(balance) <= 0 {
             let resolved = depositPlanAmountResolution(existingClothing: clothing)
             if resolved.balance > 0 {
@@ -2594,6 +2564,7 @@ struct ClothingEditView: View {
     }
 
     private func getAllOptions(for field: ClothingField) -> [String] {
+        if field == .condition { return ClothingCondition.options }
         // ponytail: sheet 选项只来自衣橱用户数据 + 当前已选，不灌预设硬编码
         var options: Set<String> = []
         for item in allClothings {
@@ -2612,7 +2583,7 @@ struct ClothingEditView: View {
             case .length:
                 if !item.length.isEmpty { options.insert(item.length) }
             case .condition:
-                if !item.condition.isEmpty { options.insert(item.condition) }
+                options.insert(item.physicalCondition)
             }
         }
         options.formUnion(CommaSeparatedTokens.parse(binding(for: field).wrappedValue))
@@ -2640,7 +2611,7 @@ struct ClothingEditView: View {
     }
 
     @discardableResult
-    private func save(enforcedCondition: String? = nil) -> Bool {
+    private func save() -> Bool {
         syncCurrencyAmountsFromPreferredCurrency()
         updateTotalPrice()
 
@@ -2697,12 +2668,7 @@ struct ClothingEditView: View {
         let finalSizes = normalizeTags(sizes)
         let finalAccessories = normalizeTags(accessories)
         let finalLength = length.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if let enforcedCondition {
-            condition = enforcedCondition
-        }
-        let finalCondition = (enforcedCondition ?? condition)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .uppercased()
+        let finalCondition = ClothingCondition.resolve(condition).rawValue
 
         // 更新自动补全索引
         SuggestionManager.shared.addData(field: .name, value: name)
@@ -2732,7 +2698,9 @@ struct ClothingEditView: View {
             c.colors = finalColors
             c.sizes = finalSizes
             c.length = finalLength
-            c.condition = finalCondition
+            if c.physicalCondition != finalCondition || ClothingCondition.isLegacyPurchaseState(c.condition) {
+                c.physicalCondition = finalCondition
+            }
             c.accessories = finalAccessories
             // 检查 replacedCutoutID 是否还有效
             if let replacedID = c.replacedCutoutID {
@@ -2912,20 +2880,5 @@ struct ClothingEditView: View {
     /// 更新衣物数量缓存，用于魔法任务进度实时显示
     private func updateClothingCountCache() {
         FeatureUnlockManager.shared.refreshClothingCountCache(from: modelContext, reason: "clothing-edit-save")
-    }
-}
-
-private extension ClothingReservationKind {
-    var conditionWhenSwitchingFromOwned: String? {
-        switch self {
-        case .owned:
-            return nil
-        case .fullPaymentReservation:
-            return "未到货"
-        case .depositPlan:
-            return "待付尾款"
-        case .sold:
-            return nil
-        }
     }
 }

@@ -168,7 +168,7 @@ final class ShopCatalogWardrobeImageImportTests: XCTestCase {
             CatalogProductVariant(id: "green", productID: product.id, color: "绿色")
         ]))
         XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "粉色"),
-                       ["gallery-cover", "unknown-detail"])
+                       ["shared", "gallery-cover", "unknown-detail"])
         XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product, store: store, selectedColor: "绿色"),
                        ["gallery-cover", "unknown-detail"])
         XCTAssertEqual(ShopCatalogWardrobeImageImporter.references(product: product,
@@ -209,6 +209,7 @@ final class ShopCatalogWardrobeImageImportTests: XCTestCase {
             XCTFail("不能把已有图片的商品静默保存成空图衣物")
         } catch {
             XCTAssertTrue(error is ShopCatalogWardrobeImageImporter.ImportError)
+            XCTAssertEqual(error.localizedDescription, "所选配色没有可用图片，请检查商品的配色图片配置")
         }
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<Clothing>()), 0)
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<StoredImage>()), 0)
@@ -282,6 +283,95 @@ final class ShopCatalogWardrobeImageImportTests: XCTestCase {
         XCTAssertEqual(try context.fetchCount(FetchDescriptor<StoredImage>()), 1)
         XCTAssertEqual(try context.fetch(FetchDescriptor<StoredImage>()).first?.refCount, 2)
         XCTAssertEqual(WardrobeStorageInventory.entries(clothings: inserted).map(\.category), [.wardrobe])
+    }
+
+    func testBBHatSharedPhotoIsPersistedForEverySelectedColor() async throws {
+        let bytes = imageData()
+        let key = ShopCatalogSyncProtocol.sha256Hex(bytes)
+        var hat = product(images: ["group-photo"])
+        hat.name = "BB帽"
+        hat.category = "小物"
+        let colors = ["粉色", "黄色", "蓝色"]
+        let store = ShopCatalogStore(catalog: ShopCatalog(products: [hat], variants: colors.map {
+            CatalogProductVariant(id: $0, productID: hat.id, color: $0, size: "F", imageAssetID: "group-photo")
+        }, assets: [CatalogAsset(id: "group-photo", type: .productImage, originalURL: "thmedia:" + key)]))
+        let media = ShopCatalogMediaStore(reader: MediaReader(data: bytes))
+        for color in colors {
+            let paths = try await ShopCatalogWardrobeImageImporter.materialize(product: hat, store: store,
+                modelContext: context, selectedColor: color, mediaStore: media)
+            savedPaths += paths
+            let selection = ShopCatalogWardrobeDraftBuilder.Selection(productID: hat.id, color: color)
+            let draft = try XCTUnwrap(ShopCatalogWardrobeDraftBuilder.makeDraft(selection: selection, store: store))
+            let clothing = try ShopCatalogWardrobeInserter.insert(draft: draft.with(imagePaths: paths),
+                selection: selection, store: store, modelContext: context)
+            XCTAssertEqual(clothing.imagePaths.count, 1)
+            XCTAssertEqual(clothing.colors, color)
+        }
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<Clothing>()), 3)
+        XCTAssertEqual(try context.fetch(FetchDescriptor<StoredImage>()).first?.refCount, 3)
+    }
+
+    func testMissingOriginalFallsBackToCloudPreviewAndPersistsIt() async throws {
+        let bytes = imageData()
+        let key = ShopCatalogSyncProtocol.sha256Hex(bytes)
+        let missingKey = String(repeating: "a", count: 64)
+        let asset = CatalogAsset(id: "cover", type: .productImage, previewURL: "thmedia:" + key,
+            originalURL: "thmedia:" + missingKey, mediaKey: missingKey)
+        let item = product(images: [asset.id])
+        let store = ShopCatalogStore(catalog: ShopCatalog(products: [item], assets: [asset]))
+        let reader = SelectiveMediaReader(images: [key: bytes])
+        savedPaths = try await ShopCatalogWardrobeImageImporter.materialize(product: item, store: store,
+            modelContext: context, mediaStore: ShopCatalogMediaStore(reader: reader))
+        XCTAssertEqual(savedPaths.count, 1)
+        let requests = await reader.requests
+        XCTAssertEqual(requests, [missingKey, key])
+        XCTAssertNotNil(UIImage(contentsOfFile: ImageManager.shared.imagesDirectory
+            .appendingPathComponent(savedPaths[0]).path))
+    }
+
+    func testCorruptDownloadCacheIsRemovedAndDownloadedAgain() async throws {
+        let bytes = imageData()
+        let key = ShopCatalogSyncProtocol.sha256Hex(bytes)
+        let brokenURL = try ShopCatalogPackCache.installMedia(Data("broken".utf8), contentHash: key, fileExtension: "png")
+        let reader = SelectiveMediaReader(images: [key: bytes])
+        let media = ShopCatalogMediaStore(reader: reader)
+        let resolvedURL = await media.resolvedURL(mediaKey: key)
+        let repairedURL = try XCTUnwrap(resolvedURL)
+        XCTAssertEqual(repairedURL, brokenURL)
+        XCTAssertEqual(try Data(contentsOf: repairedURL), bytes)
+        _ = await media.resolvedURL(mediaKey: key)
+        let requests = await reader.requests
+        XCTAssertEqual(requests, [key], "有效缓存复用，不反复下载")
+    }
+
+    func testWrongHashAndTruncatedImagesNeverEnterDownloadCache() async throws {
+        let bytes = imageData()
+        let truncated = Data(bytes.prefix(40))
+        for (key, payload) in [(String(repeating: "a", count: 64), bytes),
+                               (ShopCatalogSyncProtocol.sha256Hex(truncated), truncated)] {
+            let media = ShopCatalogMediaStore(reader: MediaReader(data: payload))
+            let url = await media.resolvedURL(mediaKey: key)
+            XCTAssertNil(url)
+            XCTAssertNil(ShopCatalogPackCache.cachedMediaURL(contentHash: key))
+        }
+    }
+
+    private actor SelectiveMediaReader: ShopCatalogPublicReading {
+        let images: [String: Data]
+        private(set) var requests: [String] = []
+        init(images: [String: Data]) { self.images = images }
+        func fetchReleaseHeader() async throws -> ShopCatalogReleaseHeader {
+            throw ShopCatalogSyncError.recordMissing(recordType: "THRelease", recordName: "test")
+        }
+        func fetchRootIndex() async throws -> Data { Data() }
+        func fetchPack(payloadHash: String) async throws -> Data { Data() }
+        func fetchMedia(contentHash: String) async throws -> Data {
+            requests.append(contentHash)
+            guard let bytes = images[contentHash] else {
+                throw ShopCatalogSyncError.recordMissing(recordType: "THMedia", recordName: contentHash)
+            }
+            return bytes
+        }
     }
 
     private func product(images: [String]) -> CatalogProduct {

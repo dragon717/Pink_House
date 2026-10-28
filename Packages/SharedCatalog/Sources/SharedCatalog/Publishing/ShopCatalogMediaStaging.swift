@@ -186,7 +186,7 @@ public nonisolated enum ShopCatalogMediaStaging {
         return pixelSize(of: source)
     }
 
-    /// 现存文件是否可直接入库（MIME 与字节数门槛）。
+    /// 现存文件是否可直接入库（类型、字节数、完整性与实际像素解码）。
     /// 返回 nil = 通过，否则是拒收原因。
     public static func rejectionReason(forStoredBytes data: Data) -> String? {
         if data.count > ShopCatalogSyncProtocol.maxMediaBytes {
@@ -199,6 +199,16 @@ public nonisolated enum ShopCatalogMediaStaging {
         }
         guard ShopCatalogSyncProtocol.isAllowedMediaMimeType(mimeType) else {
             return "类型 \(mimeType) 不在白名单内"
+        }
+        guard CGImageSourceGetStatus(source) == .statusComplete, CGImageSourceGetCount(source) > 0 else {
+            return "图片数据不完整"
+        }
+        for index in 0..<CGImageSourceGetCount(source) {
+            guard CGImageSourceCreateImageAtIndex(source, index,
+                [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) != nil,
+                CGImageSourceGetStatusAtIndex(source, index) == .statusComplete else {
+                return "图片第 \(index + 1) 帧无法完整解码"
+            }
         }
         return nil
     }

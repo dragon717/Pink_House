@@ -6,6 +6,7 @@
 
 ## 入橱选择
 
+- 2026-10-17：系列选购页同时提供「逐件加入」与「合并加入」。逐件加入按列表顺序一次确认一件，成功后自动进入下一件；主衣物与小物均独立成条。已选配色、尺码和价格口径传入各件确认页，购买批次、付款方式与备注逐件确认。取消只结束本轮，已保存商品取消勾选，尚未保存商品保留勾选；失败留在当前商品，不推进、不发奖励。合并加入保留下列主衣物与小物规则。
 - 入橱确认页默认选中第一件主衣物；JSK / OP / SK / Blouse 沿用统一分类，每件主衣物生成一条衣橱记录。
 - 小物初始不勾选。仅用户勾选的小物参与加入方式、金额预览、图片导入和小物明细落库；用户取消勾选后，页面再次出现不得自动选回。
 - 只有小物时，默认第一件作为独立衣橱主条目；切换主条目必须同步到草稿。主条目不能再次作为自己的小物重复记账。
@@ -155,3 +156,34 @@ iOS 构建与测试 **PASS：105 项通过、0 失败、0 跳过**，运行于 i
 ## 2026-10-16 入橱确认页内选择购买批次
 
 对已配置团次或批次的商品，在原入橱确认页内用简洁菜单选择，不另开选择步骤。此处只显示批次名称；尾款原文、预计日期及依据统一放在系列和每件商品详情的折叠行内。单批次也不静默默认，未分批商品沿用原流程。详见 [同页选择与紧凑详情](SHOP_CATALOG_INLINE_BATCH_PICKER_2026-10-16.md)；上午的独立弹窗记录仅作历史验证。
+
+## 2026-10-17 多选商品逐件加入
+
+系列选购页底部保留「合并加入」，新增「逐件加入」。逐件确认页显示当前进度（如 1/3），保存成功后自动进入下一件，全部成功后关闭。每件确认页使用独立状态，避免备注、购买批次和付款方式串到下一件。保存入口仍为 `ShopCatalogWardrobeAddition.addSet`，沿用长期图片引用、系统收尾、成功反馈和实际到账鱼币。
+
+验证环境：Xcode 27.0（27A266a），scheme `ItemManager`，iPhone 17 Pro 模拟器 `Codex DIY Outfit QA`，iOS 26.3.1。
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
+  -project ItemManager.xcodeproj -scheme ItemManager \
+  -destination 'platform=iOS Simulator,id=F64FFA05-1AA0-4C8F-9920-F18A772486CB' \
+  -derivedDataPath /private/tmp/pink-house-reservation-batches-ios \
+  -clonedSourcePackagesDirPath /Users/sangyu/Library/Developer/Xcode/DerivedData/ItemManager-cujimhkdzvadtsdanhkygjqfdyoh/SourcePackages \
+  -disableAutomaticPackageResolution -skipPackageUpdates -jobs 3 \
+  -parallel-testing-enabled NO \
+  -only-testing:ItemManagerTests/ShopCatalogWardrobeIndividualAdditionTests \
+  -only-testing:ItemManagerTests/ShopCatalogEntryDefaultsTests \
+  -only-testing:ItemManagerTests/ShopCatalogMergeEntryChoiceTests \
+  -only-testing:ItemManagerTests/ShopCatalogWardrobeImageImportTests \
+  -resultBundlePath /private/tmp/pink-house-individual-addition-20261017.xcresult
+```
+
+结果：构建与测试 **PASS，31 项通过，0 失败，0 跳过**。覆盖逐件顺序、重复/过期回调不推进、取消后的剩余勾选、空选择，以及原合并默认值、记账口径和图片保存/失败回滚。实际 SwiftUI 页面渲染了两个入口、首件 1/2 与小物末件 2/2，已目视核对按钮、进度与独立主条目。截图是隔离夹具渲染，第二件通过队列状态构造；未执行完整连续点击保存验收。
+
+日志：`/private/tmp/pink-house-individual-addition-20261017.log`；截图及索引：`/private/tmp/pink-house-individual-addition-20261017-screenshots/`。保留项目已有 Swift 并发警告。本次未进行真机或云端能力验收，未发布 TestFlight / App Store，需新版客户端安装后生效。
+
+## 2026-10-18 一键分别入橱
+
+用户要求取代上一节逐件确认队列：现在在同一确认页选好全部商品后，一次确认并分别生成独立衣物，小物也单独成条；保留「合并加入」。沿用统一批量入库、图片保存、失败回滚及一次成功/实际到账鱼币反馈。根因、规则与验证边界见 [系列汇总与一键分别入橱](DEPOSIT_SERIES_AND_BATCH_INDIVIDUAL_ENTRY_2026-10-18.md)。
+
+2026-10-18 用户确认：梨园梦瓷 ¥7,934 已包含附属小物。共用计算统一为「衣物单件金额 × 数量 + 小物明细一次」，定金、尾款和相关展示共用模型口径。¥418 差额的逐项核对、79 项回归及两张截图的单价版本说明见上述修复记录。

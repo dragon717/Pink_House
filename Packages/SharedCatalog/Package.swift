@@ -34,6 +34,7 @@ let package = Package(
     ],
     products: [
         .library(name: "SharedCatalog", targets: ["SharedCatalog"]),
+        .executable(name: "CatalogImageAudit", targets: ["CatalogImageAudit"]),
     ],
     targets: [
         .target(
@@ -49,5 +50,6 @@ let package = Package(
                 .swiftLanguageMode(.v5),
             ]
         ),
+        .executableTarget(name: "CatalogImageAudit", dependencies: ["SharedCatalog"]),
     ]
 )

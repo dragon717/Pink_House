@@ -26,6 +26,17 @@ enum DepositStatusFilter: String, CaseIterable, Identifiable, Hashable, Sendable
 
     var id: String { rawValue }
 
+    /// 筛选、后台快照和显示缓存共用状态判定；历史尾款金额不代表仍未付清。
+    nonisolated func includes(_ kind: ClothingReservationKind) -> Bool {
+        switch self {
+        case .all: return true
+        case .owned: return kind == .owned
+        case .fullPaymentReservation: return kind == .fullPaymentReservation
+        case .depositPlan: return kind == .depositPlan
+        case .sold: return kind == .sold
+        }
+    }
+
     var displayName: String {
         switch self {
         case .all: return "全部".appLocalized
@@ -412,7 +423,7 @@ struct MultiDimensionalFilterSheet: View {
         }
 
         for condition in selectedConditions.sorted() {
-            let name = condition == MultiDimensionalFilterSheet.noConditionMarker ? "无状态" : condition
+            let name = condition == MultiDimensionalFilterSheet.noConditionMarker ? "无状况" : condition
             items.append(SelectedFilterItem(section: .condition, value: name, rawValue: condition))
         }
 
@@ -584,7 +595,7 @@ struct MultiDimensionalFilterSheet: View {
         case .length:
             return ("衣长", "arrow.up.and.down", selectedLengths.count, lengthOptions)
         case .condition:
-            return ("状态", "star", selectedConditions.count, conditionOptions)
+            return ("状况", "star", selectedConditions.count, conditionOptions)
         case .accessories:
             return ("小物", "sparkles", selectedAccessories.count, accessoryOptions)
         }
@@ -692,8 +703,7 @@ struct MultiDimensionalFilterSheet: View {
 
     // 状态选项
     private var conditionOptions: [FilterOption] {
-        [specialOption(section: .condition, value: MultiDimensionalFilterSheet.noConditionMarker, displayName: "无状态")] +
-        facetSnapshot.conditions.map { FilterOption(section: .condition, value: $0, displayName: $0, isSpecial: false) }
+        ClothingCondition.options.map { FilterOption(section: .condition, value: $0, displayName: $0, isSpecial: false) }
     }
 
     // 小物选项

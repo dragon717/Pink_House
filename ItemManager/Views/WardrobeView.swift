@@ -16,8 +16,7 @@ private struct WardrobeClothingRevision: Hashable {
     let lastModified: Date
     let deletedAt: Date?
     let sortIndex: Int
-    let isDepositPlan: Bool
-    let isFullPaymentReservation: Bool
+    let reservationKind: ClothingReservationKind
 }
 
 private struct WardrobeFilterSignature: Hashable {
@@ -84,9 +83,7 @@ struct WardrobeClothingSnapshot: Sendable {
     let wardrobeValueAmount: Decimal
     let dressValueAmount: Decimal
     let stock: Int
-    let isDepositPlan: Bool
-    let isFullPaymentReservation: Bool
-    let isSold: Bool
+    let reservationKind: ClothingReservationKind
     let sortIndex: Int
     let purchaseDate: Date
     let createdAt: Date
@@ -107,16 +104,14 @@ struct WardrobeClothingSnapshot: Sendable {
         self.colors = clothing.colors
         self.sizes = clothing.sizes
         self.length = clothing.length
-        self.condition = clothing.condition
+        self.condition = clothing.physicalCondition
         self.accessories = clothing.accessories
         self.note = clothing.note
         self.price = clothing.price
         self.wardrobeValueAmount = WealthViewModel.sanitizedWardrobeContribution(for: clothing)
         self.dressValueAmount = WealthViewModel.sanitizedDressValueContribution(for: clothing)
         self.stock = clothing.stock
-        self.isDepositPlan = clothing.isDepositPlan
-        self.isFullPaymentReservation = clothing.isFullPaymentReservation
-        self.isSold = clothing.reservationKind == .sold
+        self.reservationKind = clothing.reservationKind
         self.sortIndex = clothing.sortIndex
         self.purchaseDate = clothing.purchaseDate
         self.createdAt = clothing.createdAt
@@ -164,9 +159,16 @@ struct WardrobeFilterResult: Sendable {
 }
 
 enum WardrobeFilterEngine {
+    /// 编辑中的拖动顺序保留，筛掉的记录移除，新出现的记录按筛选顺序补入。
+    nonisolated static func displayOrder(existingIDs: [UUID], filteredIDs: [UUID]) -> [UUID] {
+        let allowed = Set(filteredIDs)
+        var seen = Set<UUID>()
+        return (existingIDs + filteredIDs).filter { allowed.contains($0) && seen.insert($0).inserted }
+    }
+
     nonisolated static func evaluate(_ input: WardrobeFilterInput) -> WardrobeFilterResult {
         if Task.isCancelled {
-            return WardrobeFilterResult(ids: [], stats: .empty, conditionOptions: ["全新"])
+            return WardrobeFilterResult(ids: [], stats: .empty, conditionOptions: ClothingCondition.options)
         }
 
         let homeSnapshots = input.snapshots.filter {
@@ -281,18 +283,7 @@ enum WardrobeFilterEngine {
     }
 
     private nonisolated static func matchesDepositStatus(_ snapshot: WardrobeClothingSnapshot, rawValue: String) -> Bool {
-        switch rawValue {
-        case "owned":
-            return !snapshot.isDepositPlan && !snapshot.isSold
-        case "fullPaymentReservation":
-            return snapshot.isFullPaymentReservation
-        case "depositPlan":
-            return snapshot.isDepositPlan && !snapshot.isFullPaymentReservation
-        case "sold":
-            return snapshot.isSold
-        default:
-            return true
-        }
+        (DepositStatusFilter(rawValue: rawValue) ?? .all).includes(snapshot.reservationKind)
     }
 
     private nonisolated static func sorted(_ snapshots: [WardrobeClothingSnapshot], sortOptionRawValue: String) -> [WardrobeClothingSnapshot] {
@@ -316,9 +307,9 @@ enum WardrobeFilterEngine {
         }
     }
 
-    private nonisolated static func statsSummary(for snapshots: [WardrobeClothingSnapshot]) -> WardrobeStatsSummary {
+    nonisolated static func statsSummary(for snapshots: [WardrobeClothingSnapshot]) -> WardrobeStatsSummary {
         snapshots.reduce(into: WardrobeStatsSummary.empty) { partial, snapshot in
-            guard !snapshot.isSold else { return }
+            guard snapshot.reservationKind != .sold else { return }
             partial.styleCount += 1
             partial.totalCount += snapshot.stock
             partial.dressValue += snapshot.dressValueAmount
@@ -327,11 +318,7 @@ enum WardrobeFilterEngine {
     }
 
     private nonisolated static func conditionOptions(from snapshots: [WardrobeClothingSnapshot]) -> [String] {
-        let values = snapshots
-            .flatMap { splitValues($0.condition) }
-            .filter { !$0.isEmpty }
-        let options = Array(Set(values)).sorted()
-        return options.isEmpty ? ["全新"] : options
+        ClothingCondition.options
     }
 
     private nonisolated static func splitValues(_ string: String) -> Set<String> {
@@ -547,10 +534,11 @@ struct WardrobeView: View {
     @State private var hasShownStatsRulePrompt = false
     @State private var isShowingStatsRuleHint = false
     @State private var statsRuleHintTask: Task<Void, Never>?
-    @State private var filteredClothings: [Clothing] = []
+    @State private var cachedFilteredClothings: [Clothing] = []
     @State private var cellSnapshotCache: [UUID: WardrobeCellSnapshot] = [:]
-    @State private var filteredStatsSummary: WardrobeStatsSummary = .empty
-    @State private var conditionBatchOptionsCache: [String] = ["全新"]
+    @State private var cachedFilteredStatsSummary: WardrobeStatsSummary = .empty
+    @State private var cachedFilterSignature: WardrobeFilterSignature?
+    @State private var conditionBatchOptionsCache: [String] = ClothingCondition.options
     @State private var cachedGridColumns: [GridItem]
     @State private var cachedWardrobeThemeDescriptor: ThemeSkinDescriptor?
     @State private var wardrobeCellThemeInputs: WardrobeCellThemeInputs
@@ -627,6 +615,24 @@ struct WardrobeView: View {
     // Filter Actions
     let filterDescription: String?
     let onClearFilter: (() -> Void)?
+
+    private var filteredClothings: [Clothing] {
+        ClothingFilterService.filterByDepositStatus(cachedFilteredClothings, filter: depositStatusFilter)
+    }
+
+    private var filteredStatsSummary: WardrobeStatsSummary {
+        let displayed = filteredClothings
+        guard cachedFilterSignature == filterSignature,
+              displayed.count == cachedFilteredClothings.count else {
+            return WardrobeFilterEngine.statsSummary(for: displayed.map(WardrobeClothingSnapshot.init(clothing:)))
+        }
+        return cachedFilteredStatsSummary
+    }
+
+    private var displayedEditableClothings: [Clothing] {
+        let visibleIDs = Set(filteredClothings.map(\.id))
+        return editableClothings.filter { visibleIDs.contains($0.id) }
+    }
     
     init(searchText: Binding<String>,
          isSelectionMode: Binding<Bool>,
@@ -648,7 +654,10 @@ struct WardrobeView: View {
         _isSelectionMode = isSelectionMode
         _isEditing = isEditing
         self.sortOption = sortOption
-        _clothings = Query(filter: #Predicate<Clothing> { $0.deletedAt == nil }, sort: sortOption.sortDescriptors)
+        var descriptor = FetchDescriptor<Clothing>(predicate: #Predicate<Clothing> { $0.deletedAt == nil },
+                                                  sortBy: sortOption.sortDescriptors)
+        descriptor.relationshipKeyPathsForPrefetching = [\Clothing.accessoryItems]
+        _clothings = Query(descriptor)
         self.viewLayout = viewLayout
         _cachedGridColumns = State(initialValue: Self.makeGridColumns(for: viewLayout))
         _cachedWardrobeThemeDescriptor = State(initialValue: ThemeSkinManager.shared.descriptor(for: .wardrobeItemCard))
@@ -790,7 +799,7 @@ struct WardrobeView: View {
 
     @MainActor
     private func cellSnapshot(for clothing: Clothing) -> WardrobeCellSnapshot {
-        cellSnapshotCache[clothing.id] ?? WardrobeCellSnapshot(clothing: clothing)
+        WardrobeCellSnapshot.current(clothing: clothing, cached: cellSnapshotCache[clothing.id])
     }
 
     @MainActor
@@ -882,8 +891,7 @@ struct WardrobeView: View {
                     lastModified: clothing.lastModified,
                     deletedAt: clothing.deletedAt,
                     sortIndex: clothing.sortIndex,
-                    isDepositPlan: clothing.isDepositPlan,
-                    isFullPaymentReservation: clothing.isFullPaymentReservation
+                    reservationKind: clothing.reservationKind
                 )
             },
             storageCabinets: storageSettings.cabinets
@@ -1390,7 +1398,7 @@ struct WardrobeView: View {
     private var gridWardrobeView: some View {
         ScrollViewReader { proxy in
             let filtered = filteredClothings
-            let displayed = isReorderTrackingEnabled ? editableClothings : filtered
+            let displayed = isReorderTrackingEnabled ? displayedEditableClothings : filtered
             let firstFilteredID = filtered.first?.id
             ZStack {
                 gridScrollContent(displayed: displayed, firstFilteredID: firstFilteredID)
@@ -1874,8 +1882,11 @@ struct WardrobeView: View {
     
     private func batchSetCondition(_ condition: String) {
         let items = clothings.filter { selectedItemIDs.contains($0.id) }
+        let now = Date()
         for item in items {
-            item.condition = condition
+            item.physicalCondition = condition
+            item.updatedAt = now
+            item.lastModified = now
         }
         try? modelContext.save()
         batchEditDraft.selectedCondition = nil
@@ -2198,7 +2209,7 @@ struct WardrobeView: View {
         ZStack(alignment: .top) {
             List {
                 editableListStatsSpacer
-                if editableClothings.isEmpty {
+                if displayedEditableClothings.isEmpty {
                     wardrobeEmptyState
                         .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 20, trailing: 0))
                         .listRowBackground(Color.clear)
@@ -2247,12 +2258,18 @@ struct WardrobeView: View {
     }
 
     private var listContent: some View {
-        ForEach(isEditing ? editableClothings : filteredClothings) { clothing in
+        ForEach(isEditing ? displayedEditableClothings : filteredClothings) { clothing in
             listRow(for: clothing)
         }
         .onMove { from, to in
             if isEditing {
-                editableClothings.move(fromOffsets: from, toOffset: to)
+                var visible = displayedEditableClothings
+                visible.move(fromOffsets: from, toOffset: to)
+                let visibleIDs = Set(visible.map(\.id))
+                var reordered = visible.makeIterator()
+                editableClothings = editableClothings.map {
+                    visibleIDs.contains($0.id) ? (reordered.next() ?? $0) : $0
+                }
             }
         }
     }
@@ -2521,6 +2538,7 @@ struct WardrobeView: View {
             )
         }
 
+        let signature = filterSignature
         let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
         let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))
         var cellSnapshots: [UUID: WardrobeCellSnapshot] = [:]
@@ -2557,14 +2575,17 @@ struct WardrobeView: View {
         }
         let resolvedClothings = result.ids.compactMap { clothingByID[$0] }
 
-        filteredClothings = resolvedClothings
+        cachedFilteredClothings = resolvedClothings
         cellSnapshotCache = cellSnapshots
-        filteredStatsSummary = result.stats
+        cachedFilteredStatsSummary = result.stats
+        cachedFilterSignature = signature
         conditionBatchOptionsCache = result.conditionOptions
         prefetchInitialWardrobeImages(resolvedClothings, snapshots: cellSnapshots)
 
-        if isReorderTrackingEnabled && editableClothings.isEmpty {
-            editableClothings = resolvedClothings
+        if isReorderTrackingEnabled {
+            editableClothings = WardrobeFilterEngine.displayOrder(
+                existingIDs: editableClothings.map(\.id), filteredIDs: result.ids
+            ).compactMap { clothingByID[$0] }
         }
     }
 
@@ -3120,9 +3141,9 @@ struct MergeToAccessorySheet: View {
         if !selectedConditions.isEmpty {
             result = result.filter { clothing in
                 if selectedConditions.contains(MergeToAccessorySheet.noConditionMarker) {
-                    return clothing.condition.isEmpty
+                    return clothing.physicalCondition.isEmpty
                 }
-                return selectedConditions.contains(clothing.condition)
+                return selectedConditions.contains(clothing.physicalCondition)
             }
         }
 
@@ -3139,18 +3160,7 @@ struct MergeToAccessorySheet: View {
         }
 
         // 状态筛选：已拥有 / 全款预约 / 心愿尾款 / 已售出
-        switch depositStatusFilter {
-        case .all:
-            break
-        case .owned:
-            result = result.filter { $0.reservationKind == .owned }
-        case .fullPaymentReservation:
-            result = result.filter(\.isFullPaymentReservation)
-        case .depositPlan:
-            result = result.filter { $0.isFinalPaymentPlan }
-        case .sold:
-            result = result.filter { $0.reservationKind == .sold }
-        }
+        result = ClothingFilterService.filterByDepositStatus(result, filter: depositStatusFilter)
 
         return result
     }
@@ -3302,7 +3312,7 @@ struct MergeToAccessorySheet: View {
         items.append(contentsOf: selectedColors.map { $0 == MergeToAccessorySheet.noColorMarker ? "无颜色".appLocalized : $0 })
         items.append(contentsOf: selectedSizes.map { $0 == MergeToAccessorySheet.noSizeMarker ? "无尺码".appLocalized : $0 })
         items.append(contentsOf: selectedLengths.map { $0 == MergeToAccessorySheet.noLengthMarker ? "无衣长".appLocalized : $0 })
-        items.append(contentsOf: selectedConditions.map { $0 == MergeToAccessorySheet.noConditionMarker ? "无状态".appLocalized : $0 })
+        items.append(contentsOf: selectedConditions.map { $0 == MergeToAccessorySheet.noConditionMarker ? "无状况".appLocalized : $0 })
         items.append(contentsOf: selectedAccessories.map { $0 == MergeToAccessorySheet.noAccessoryMarker ? "无小物".appLocalized : $0 })
 
         return items
@@ -3520,7 +3530,7 @@ struct MergeAccessoryFilterSheet: View {
         }
 
         for condition in selectedConditions {
-            let name = condition == MergeToAccessorySheet.noConditionMarker ? "无状态".appLocalized : condition
+            let name = condition == MergeToAccessorySheet.noConditionMarker ? "无状况".appLocalized : condition
             items.append(SelectedFilterItem(section: .condition, value: name, rawValue: condition))
         }
 
@@ -3651,7 +3661,7 @@ struct MergeAccessoryFilterSheet: View {
         case .length:
             return ("衣长", "arrow.up.and.down", selectedLengths.count, lengthOptions)
         case .condition:
-            return ("状态", "star", selectedConditions.count, conditionOptions)
+            return ("状况", "star", selectedConditions.count, conditionOptions)
         case .accessories:
             return ("小物", "sparkles", selectedAccessories.count, accessoryOptions)
         }
@@ -3757,11 +3767,7 @@ struct MergeAccessoryFilterSheet: View {
     }
 
     private var conditionOptions: [MergeFilterOption] {
-        var options: [MergeFilterOption] = []
-        options.append(MergeFilterOption(value: MergeToAccessorySheet.noConditionMarker, displayName: "无状态".appLocalized))
-        let values = getAllValues(for: \.condition)
-        options.append(contentsOf: values.map { MergeFilterOption(value: $0, displayName: $0) })
-        return options
+        ClothingCondition.options.map { MergeFilterOption(value: $0, displayName: $0) }
     }
 
     private var accessoryOptions: [MergeFilterOption] {

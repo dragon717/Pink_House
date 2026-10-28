@@ -115,7 +115,7 @@ private struct WardrobeMenuFacetClothingRow: Equatable, Sendable {
         colors = clothing.colors
         sizes = clothing.sizes
         length = clothing.length
-        condition = clothing.condition
+        condition = clothing.physicalCondition
         accessories = clothing.accessories
     }
 }
@@ -239,7 +239,7 @@ private final class WardrobeMenuFacetCache: ObservableObject {
             colors: distinctValues(sourceKey.clothings.map(\.colors)),
             sizes: distinctValues(sourceKey.clothings.map(\.sizes)),
             lengths: distinctValues(sourceKey.clothings.map(\.length)),
-            conditions: distinctValues(sourceKey.clothings.map(\.condition)),
+            conditions: ClothingCondition.options,
             accessories: distinctValues(sourceKey.clothings.map(\.accessories)),
             tagNameByID: nameByID(from: tagOptions),
             brandNameByID: nameByID(from: brandOptions),
@@ -325,18 +325,20 @@ private struct FilterSubmenuView: View, Equatable {
                 Label("清除筛选".appLocalized, systemImage: "xmark.circle")
             }
 
-            Button {
-                if selection.contains(noValueMarker) {
-                    selection.remove(noValueMarker)
-                } else {
-                    selection.removeAll()
-                    selection.insert(noValueMarker)
-                }
-            } label: {
-                HStack {
-                    Text(emptyDisplayName.appLocalized)
+            if field != .condition {
+                Button {
                     if selection.contains(noValueMarker) {
-                        Image(systemName: "checkmark")
+                        selection.remove(noValueMarker)
+                    } else {
+                        selection.removeAll()
+                        selection.insert(noValueMarker)
+                    }
+                } label: {
+                    HStack {
+                        Text(emptyDisplayName.appLocalized)
+                        if selection.contains(noValueMarker) {
+                            Image(systemName: "checkmark")
+                        }
                     }
                 }
             }
@@ -374,7 +376,7 @@ private struct FilterSubmenuView: View, Equatable {
         case .colors: return "无颜色"
         case .sizes: return "无尺码"
         case .length: return "无衣长"
-        case .condition: return "无状态"
+        case .condition: return "无状况"
         case .accessories: return "无小物"
         }
     }
@@ -2084,7 +2086,7 @@ struct HomeView: View {
         
         // Conditions
         if !selectedConditions.isEmpty {
-            let names = selectedConditions.map { $0 == HomeView.noConditionMarker ? "无状态".appLocalized : $0 }
+            let names = selectedConditions.map { $0 == HomeView.noConditionMarker ? "无状况".appLocalized : $0 }
             descriptions.append(names.joined(separator: "/"))
         }
         

@@ -67,6 +67,15 @@ final class ShopCatalogMediaReferenceTests: XCTestCase {
         XCTAssertFalse(fields.contains("variants.imageAssetID"), "规格图存的是 asset id，不是文件")
     }
 
+    func testDirectMediaInProductAndVariantFieldsIsCollectedWithoutChangingAssetIDs() {
+        let product = CatalogProduct(id: "p", shopID: "s", seriesID: "series", name: "BB帽",
+            category: "小物", images: ["asset-cover", "local:group.png"])
+        let catalog = ShopCatalog(products: [product], variants: [CatalogProductVariant(id: "v",
+            productID: product.id, imageAssetID: "local:group.png")])
+        XCTAssertEqual(ShopCatalogMediaReferences.publisherRewritten(in: catalog).map(\.reference),
+                       ["local:group.png", "local:group.png"])
+    }
+
     /// 只有 `CatalogAsset` 的三个 URL 字段「不可能合法地写着 asset id」。
     /// 其余字段都可能是 id，必须允许，否则裸名字会被误判成悬空引用。
     func testOnlyAssetURLFieldsDisallowAssetID() {

@@ -253,7 +253,7 @@ struct ClothingDetailView: View {
                 markFullPaymentReservationReceived()
             }
         } message: {
-            Text("确认后会把这条全款预约移入已拥有，并将「未到货」状态改回「全新」。".appLocalized)
+            Text("确认后会把这条全款预约移入已拥有。".appLocalized)
         }
         .alert("确认标记出售？".appLocalized, isPresented: $showingMarkSoldAlert) {
             Button("取消".appLocalized, role: .cancel) { }
@@ -272,6 +272,10 @@ struct ClothingDetailView: View {
             Text("确认后会把剩余尾款记为已支付，并恢复为普通已购裙装。".appLocalized)
         }
         .onAppear {
+            if clothing.repairLegacyPurchaseCondition() {
+                do { try modelContext.save() }
+                catch { AppLogger.error("Failed to repair legacy clothing condition: \(error)") }
+            }
             // 进入详情页时，若定金和尾款 存在，自动重算总价并保存
             if clothing.reservationKind == .depositPlan && (clothing.deposit > 0 || clothing.balance > 0) {
                 let newTotal = clothing.deposit + clothing.balance
@@ -314,9 +318,7 @@ struct ClothingDetailView: View {
         if receivedUnitPrice > 0 {
             clothing.price = receivedUnitPrice
         }
-        if shouldResetConditionAfterReceipt(clothing.condition) {
-            clothing.condition = "全新"
-        }
+        clothing.repairLegacyPurchaseCondition(at: now)
 
         do {
             try modelContext.save()
@@ -359,11 +361,6 @@ struct ClothingDetailView: View {
             print("ClothingDetailView: Failed to mark clothing as sold: \(error)")
             ToastManager.shared.showError("标记出售失败，请稍后再试".appLocalized)
         }
-    }
-
-    private func shouldResetConditionAfterReceipt(_ condition: String) -> Bool {
-        let normalized = condition.trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty || normalized == "未到货"
     }
 
     private func formattedMetadataDate(_ date: Date) -> String {
@@ -735,7 +732,7 @@ struct ClothingDetailView: View {
         case .colors: return clothing.colors
         case .sizes: return clothing.sizes
         case .length: return clothing.length
-        case .condition: return clothing.condition
+        case .condition: return clothing.physicalCondition
         case .accessories: return clothing.accessories
         }
     }

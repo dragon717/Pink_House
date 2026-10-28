@@ -97,7 +97,7 @@ struct SeriesSelectorView: View {
                     .alert("系列分类规则".appLocalized, isPresented: $showTips) {
                         Button("知道了".appLocalized, role: .cancel) { }
                     } message: {
-                        Text("系统会自动根据商品名称的前 2-4 个字（去除特殊符号）作为系列前缀进行归类。\n\n例如：\n\"少女心愿 连衣裙\"\n\"少女心愿 半裙\"\n\n都会被归类为 \"Pink\" 系列。\n注：同名属于同一款商品。".appLocalized)
+                        Text("系统按商品名称的前 2～4 个字归类，忽略大小写和括号。共享前两字的商品合为一个系列，显示最长共同前缀；每件商品只归属一个系列。\n\n例如：美乐蒂联名、美乐蒂蜜糖归为「美乐蒂」。金额为当前筛选范围内的待付尾款，已包含数量和小物。".appLocalized)
                     }
                     
                     if isAnalyzing {

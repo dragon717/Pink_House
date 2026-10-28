@@ -26,10 +26,10 @@
 //  |---|---|---|
 //  | `assets.originalURL` / `thumbnailURL` / `previewURL` | ✅ | ❌ |
 //  | `shops.logo` / `shops.cover` / `series.cover` / `series.priceChart.*` / `sizeCharts.sourceImage` | ✅ | ✅ |
-//  | `products.images[]` / `variants.imageAssetID` | ❌ | ✅ |
+//  | `products.images[]` / `variants.imageAssetID` | 仅直接 local/thmedia 引用 | ✅ |
 //
 //  · `isRewrittenByPublisher` = **存的是文件引用**（可能是 `local:`），发布端必须改写它。
-//    把 `products.images` 也改写会把「资源 id」换成「内容摘要」，商品图直接丢；
+//    商品/规格字段中的资源 ID 保留；明确写成 local/thmedia 的直接引用也需处理。
 //  · `allowsAssetID` = **这个字段可能合法地写着一个 `CatalogAsset.id`**。
 //    为假时才有必要把裸名字判成「无法核对」（见
 //    `ShopCatalogReferenceResolution.unverifiableBareName`）。
@@ -188,24 +188,27 @@ public nonisolated enum ShopCatalogMediaReferences {
                  isRewrittenByPublisher: true, allowsAssetID: true)
         }
 
-        // 5) 商品图：**存的是 `CatalogAsset.id`，不是文件**
-        //    → 发布端不该改写它（改了就把 id 换成摘要），但要校验悬空 id。
+        // 5) 商品图：通常是 CatalogAsset.id；历史直接媒体引用也必须随包处理。
         for product in catalog.products {
             for assetID in product.images {
                 push(field: "products.images", owner: "商品「\(product.name)」/ 商品图",
                      entityID: product.id, productID: product.id, assetID,
-                     isRewrittenByPublisher: false, allowsAssetID: true)
+                     isRewrittenByPublisher: isDirectMedia(assetID), allowsAssetID: true)
             }
         }
 
-        // 6) 规格图绑定：同上，也是 `CatalogAsset.id`
+        // 6) 规格图绑定：资源 ID 保留，直接媒体引用按相同规则处理。
         for variant in catalog.variants {
             push(field: "variants.imageAssetID", owner: "规格 \(variant.id) / 规格图",
                  entityID: variant.id, productID: variant.productID, variant.imageAssetID,
-                 isRewrittenByPublisher: false, allowsAssetID: true)
+                 isRewrittenByPublisher: variant.imageAssetID.map(isDirectMedia) ?? false, allowsAssetID: true)
         }
 
         return results
+    }
+
+    private static func isDirectMedia(_ value: String) -> Bool {
+        value.hasPrefix(localPrefix) || value.hasPrefix(ShopCatalogSyncProtocol.mediaReferencePrefix)
     }
 
     /// 发布端**会改写**的全部引用（`local:` → `thmedia:`）。

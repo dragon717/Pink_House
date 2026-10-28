@@ -1084,6 +1084,14 @@ def _shop_media_references(doc: Dict[str, Any]) -> List[Tuple[str, str, str]]:
     for item in doc.get("sizeCharts") or []:
         if isinstance(item, dict):
             push("sizeCharts.sourceImage", item.get("sourceImage"), str(item.get("id", "")))
+    # 商品/规格通常存资源 ID，也允许直接媒体引用；必须一起核对，不能漏掉 local/thmedia。
+    for item in doc.get("products") or []:
+        if isinstance(item, dict):
+            for value in item.get("images") or []:
+                push("products.images[]", value, str(item.get("id", "")))
+    for item in doc.get("variants") or []:
+        if isinstance(item, dict):
+            push("variants.imageAssetID", item.get("imageAssetID"), str(item.get("id", "")))
     return found
 
 
@@ -1118,6 +1126,7 @@ def validate_shop_catalog_media(
 
     # 并集 = 本次会上传 ∪ 远端已存在。少了后者就是把「已远端化」误判成「缺失」（R5）。
     allowed = set(known_media_hashes) | set(known_remote_media_hashes or ())
+    asset_ids = {item.get("id") for item in doc.get("assets") or [] if isinstance(item, dict)}
 
     for field, value, entity_id in _shop_media_references(doc):
         if value.startswith("local:"):
@@ -1134,6 +1143,8 @@ def validate_shop_catalog_media(
         elif value.startswith(MEDIA_REFERENCE_PREFIX):
             digest = value[len(MEDIA_REFERENCE_PREFIX):]
         else:
+            if value.startswith(("asset-", "asset:")) and value not in asset_ids:
+                issues.append(_issue("media.asset.missing", "{} 引用的资源 {} 不存在".format(field, value), entity_id))
             # bundle: / http(s) / 空 —— 不走 THMedia，不在本校验范围内
             continue
         if not SHA256_HEX_RE.match(digest):

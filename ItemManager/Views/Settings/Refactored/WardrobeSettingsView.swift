@@ -332,7 +332,7 @@ struct FieldSortSettingsView: View {
         case .length:
             return ("衣长管理", "衣长 (Length)", "arrow.up.and.down", \.length, false)
         case .condition:
-            return ("状况管理", "状况 (Condition)", "star", \.condition, false)
+            return ("状况管理", "状况 (Condition)", "star", \.physicalCondition, false)
         case .accessories:
             return ("小物管理", "小物 (Accessories)", "bag", \.accessories, true)
         }

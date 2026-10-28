@@ -293,18 +293,34 @@ struct ClothingBasicInfoView: View {
     
     @ViewBuilder
     private func inlineFieldRow(for field: ClothingField) -> some View {
-        // ponytail: 行内 tag 只用来自衣橱/当前值，不灌预设硬编码
-        InlineToggleTagsRow(
-            field: field,
-            text: binding(for: field).wrappedValue,
-            textBinding: binding(for: field),
-            preferred: userTags(for: field),
-            allowsMultiple: fieldAllowsMultiple(field),
-            sizeChartImagePath: field == .sizes ? $sizeChartImagePath : nil,
-            deleteChartFileImmediately: deleteChartFileImmediately,
-            onMore: { openSelection(for: field) }
-        )
-        .equatable()
+        if field == .condition {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(field.displayName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .themeSkinLegibleText(level: .inline, slot: .sectionCard)
+                Picker(field.displayName, selection: $condition) {
+                    ForEach(ClothingCondition.options, id: \.self) { value in
+                        Text(value.appLocalized).tag(value)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel(field.displayName)
+            }
+        } else {
+            // ponytail: 行内 tag 只用来自衣橱/当前值，不灌预设硬编码
+            InlineToggleTagsRow(
+                field: field,
+                text: binding(for: field).wrappedValue,
+                textBinding: binding(for: field),
+                preferred: userTags(for: field),
+                allowsMultiple: fieldAllowsMultiple(field),
+                sizeChartImagePath: field == .sizes ? $sizeChartImagePath : nil,
+                deleteChartFileImmediately: deleteChartFileImmediately,
+                onMore: { openSelection(for: field) }
+            )
+            .equatable()
+        }
     }
 
     private func openSelection(for field: ClothingField) {
@@ -351,7 +367,7 @@ struct ClothingBasicInfoView: View {
         case .colors: return CommaSeparatedTokens.parse(item.colors)
         case .sizes: return CommaSeparatedTokens.parse(item.sizes)
         case .length: return item.length.isEmpty ? [] : [item.length]
-        case .condition: return item.condition.isEmpty ? [] : [item.condition]
+        case .condition: return [item.physicalCondition]
         case .accessories:
             var result = CommaSeparatedTokens.parse(item.accessories)
             if item.types.contains("小物"), !item.name.isEmpty {
@@ -643,8 +659,12 @@ struct ClothingPriceView: View {
             }
             
             // 汇总信息 (New Feature: Total Deposit & Balance)
-            let totalDeposit = deposit + accessoryList.reduce(0) { $0 + $1.deposit }
-            let totalBalance = balance + accessoryList.reduce(0) { $0 + $1.balance }
+            let totalDeposit = NSDecimalNumber(decimal: FinancialDataSanitizer.orderTotal(
+                unitAmount: FinancialDataSanitizer.money(deposit), stock: stock,
+                attachedAmount: accessoryList.reduce(0) { $0 + FinancialDataSanitizer.money($1.deposit) })).doubleValue
+            let totalBalance = NSDecimalNumber(decimal: FinancialDataSanitizer.orderTotal(
+                unitAmount: FinancialDataSanitizer.money(balance), stock: stock,
+                attachedAmount: accessoryList.reduce(0) { $0 + FinancialDataSanitizer.money($1.balance) })).doubleValue
             let grandTotal = priceTotal + accessoriesPrice
             let grandTotalWithShipping = grandTotal + shippingFee
             

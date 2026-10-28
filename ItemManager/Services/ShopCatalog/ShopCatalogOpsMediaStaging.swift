@@ -30,6 +30,7 @@ nonisolated enum ShopCatalogOpsMediaStagingError: LocalizedError, Equatable {
     case fileMissing(String)
     /// 文件读不出来
     case unreadable(String)
+    case invalidImage(reference: String, reason: String)
     /// MIME 不在准入白名单内（客户端解不了的类型不许进公共库）
     case unsupportedMimeType(reference: String, mimeType: String)
     /// 超出单张媒体字节上限
@@ -41,6 +42,8 @@ nonisolated enum ShopCatalogOpsMediaStagingError: LocalizedError, Equatable {
             return "图片 \(reference) 在本机找不到，无法上传（若换过设备或清过沙盒，请重新选图）"
         case .unreadable(let reference):
             return "图片 \(reference) 读取失败"
+        case .invalidImage(let reference, let reason):
+            return "图片 \(reference) 无法发布：\(reason)"
         case .unsupportedMimeType(let reference, let mimeType):
             return "图片 \(reference) 的类型 \(mimeType) 不在允许清单内"
         case .tooLarge(let reference, let byteCount):
@@ -217,6 +220,10 @@ nonisolated enum ShopCatalogOpsMediaStaging {
                 continue
             }
 
+            if let reason = ShopCatalogMediaStaging.rejectionReason(forStoredBytes: data) {
+                note(.invalidImage(reference: item.reference, reason: reason), at: item)
+                continue
+            }
             let digest = ShopCatalogSyncProtocol.sha256Hex(data)
             if var existing = byHash[digest] {
                 existing = ShopCatalogOpsStagedMedia(
@@ -349,6 +356,17 @@ nonisolated enum ShopCatalogOpsMediaStaging {
             return item
         }
 
+        rewritten.products = catalog.products.map { product in
+            var item = product
+            item.images = product.images.map { resolve($0) ?? $0 }
+            return item
+        }
+        rewritten.variants = catalog.variants.map { variant in
+            var item = variant
+            item.imageAssetID = resolve(variant.imageAssetID)
+            return item
+        }
+
         return rewritten
     }
 
@@ -361,9 +379,7 @@ nonisolated enum ShopCatalogOpsMediaStaging {
     /// 与 Mac 门禁 `ShopCatalogPublicationGate`、Python 发布端
     /// `build_release.collect_shop_catalog_media` 共用同一份。
     ///
-    /// 只取 `isRewrittenByPublisher` 那一批：`products.images` /
-    /// `variants.imageAssetID` 存的是 `CatalogAsset.id` 而不是文件，改写它们会把
-    /// 资源 id 换成内容摘要，商品图直接丢。
+    /// 只收集明确的文件引用，商品/规格中的资源 ID 保留，直接媒体引用一并处理。
     static func ownedReferences(in catalog: ShopCatalog) -> [ShopCatalogOpsMediaOwner] {
         ShopCatalogMediaReferences.publisherRewritten(in: catalog).map { reference in
             ShopCatalogOpsMediaOwner(

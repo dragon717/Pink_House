@@ -141,6 +141,21 @@ final class ShopCatalogMediaStagingTests: XCTestCase {
             ShopCatalogMediaStaging.rejectionReason(forStoredBytes: Data(repeating: 0, count: 128)))
     }
 
+    func testRecognizableButTruncatedImageIsRejectedByPublicationGate() throws {
+        let bytes = try makeImage(width: 300, height: 300, type: UTType.png.identifier)
+        let truncated = Data(bytes.prefix(40))
+        XCTAssertNotNil(CGImageSourceCreateWithData(truncated as CFData, nil), "坏图仍可能有合法格式头")
+        XCTAssertNotNil(ShopCatalogMediaStaging.rejectionReason(forStoredBytes: truncated))
+        let catalog = ShopCatalog(assets: [CatalogAsset(id: "asset", type: .productImage,
+            originalURL: "local:broken.png")])
+        let review = ShopCatalogPublicationGate.review(catalog, stagedFileNames: ["broken.png"],
+            stagedBytes: { _ in truncated })
+        XCTAssertTrue(review.blockingIssues.contains { $0.contains("broken.png") })
+        let clean = ShopCatalogPublicationGate.review(catalog, stagedFileNames: ["broken.png"],
+            stagedBytes: { _ in bytes })
+        XCTAssertTrue(clean.blockingIssues.isEmpty)
+    }
+
     // MARK: 协议常量与白名单（与 Mac 端 protocol.py 逐字对齐）
 
     func testMediaLimitsMatchPublishedProtocol() {

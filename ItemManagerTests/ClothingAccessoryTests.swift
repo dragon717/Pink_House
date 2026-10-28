@@ -98,6 +98,59 @@ final class ClothingAccessoryTests: XCTestCase {
         XCTAssertEqual(clothing.inventoryTotalPrice, 1130.0)
     }
 
+    func testDepositAndBalanceMultiplyOnlyGarmentQuantity() throws {
+        let clothing = Clothing(name: "两件主衣物一套小物", price: 698, deposit: 130, balance: 518,
+                                isDepositPlan: true, stock: 2)
+        clothing.accessoryItems = [AccessoryItem(name: "发箍", price: 109, deposit: 30, balance: 79),
+                                  AccessoryItem(name: "边夹", price: 64, deposit: 20, balance: 44)]
+        XCTAssertEqual(clothing.totalDeposit, 310)
+        XCTAssertEqual(clothing.totalBalance, 1159)
+        XCTAssertEqual(clothing.pendingFinalPaymentAmount, 1159)
+        XCTAssertEqual(clothing.reservationPaidAmount, 310)
+        XCTAssertEqual(clothing.wardrobeListTotalDeposit, clothing.totalDeposit)
+        XCTAssertEqual(clothing.wardrobeListTotalBalance, clothing.totalBalance)
+        clothing.stock = 3
+        XCTAssertEqual(clothing.totalBalance, 1677)
+        XCTAssertEqual(clothing.totalDeposit, 440)
+    }
+
+    func testFullReservationAccessoryPaymentIsAlsoCountedOnce() throws {
+        let clothing = Clothing(name: "全款两件衣物", price: 500, deposit: 500, balance: 0,
+                                isDepositPlan: true, stock: 2)
+        clothing.accessoryItems = [AccessoryItem(name: "小物", price: 100, deposit: 30, balance: 70)]
+        XCTAssertEqual(clothing.fullPaymentReservationTotalAmount, 1100)
+        XCTAssertEqual(clothing.wardrobeListFullPaymentReservationTotalAmount, 1100)
+        XCTAssertEqual(clothing.pendingFinalPaymentAmount, 0)
+    }
+
+    func testPersistedAccessoryEditsRefreshBothListAndDetailAmounts() throws {
+        let clothing = Clothing(name: "持久化金额", deposit: 100, balance: 200,
+                                isDepositPlan: true, stock: 2)
+        clothing.accessoryItems = [AccessoryItem(name: "小物", price: 50, deposit: 10, balance: 40)]
+        context.insert(clothing)
+        try context.save()
+        let freshContext = ModelContext(container)
+        let reloaded = try XCTUnwrap(freshContext.fetch(FetchDescriptor<Clothing>()).first)
+        XCTAssertEqual(reloaded.totalBalance, 440)
+        XCTAssertEqual(reloaded.wardrobeListTotalBalance, 440)
+        let accessory = try XCTUnwrap(reloaded.accessoryItems?.first)
+        accessory.balance = 30
+        try freshContext.save()
+        XCTAssertEqual(reloaded.totalBalance, 430)
+        XCTAssertEqual(reloaded.wardrobeListTotalBalance, 430)
+    }
+
+    func testStatisticsAndPetSummaryUseTheSameAttachedAccessoryAmounts() {
+        let clothing = Clothing(name: "梨园梦瓷 高腰op", price: 698, deposit: 130, balance: 518,
+                                accessoriesPrice: 173, isDepositPlan: true, stock: 2)
+        clothing.accessoryItems = [AccessoryItem(name: "发箍", price: 109, deposit: 30, balance: 79),
+                                  AccessoryItem(name: "边夹", price: 64, deposit: 20, balance: 44)]
+        XCTAssertEqual(OverviewStatsCard(clothings: [clothing]).accessoriesValue, 173)
+        let summary = WardrobeContextManager.shared.generateWardrobeSummary(clothings: [clothing])
+        XCTAssertTrue(summary.contains("已付定金总额：¥310"))
+        XCTAssertTrue(summary.contains("待付尾款总额：¥1159"))
+    }
+
     func testFinancialDataSanitizerClampsMoneyAndStock() throws {
         XCTAssertEqual(FinancialDataSanitizer.money(Decimal.nan), 0)
         XCTAssertEqual(FinancialDataSanitizer.money(Decimal(-1)), 0)

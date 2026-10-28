@@ -93,6 +93,7 @@ class SharedContainer {
             // ⚠️ 关键：延迟应用删除，确保数据已经从 iCloud 同步过来
             // 因为 ModelContainer 创建后，iCloud 同步是异步的，需要等待一段时间
             let context = self.container.mainContext
+            ClothingConditionRepair.repair(context: context)
             DeleteTracker.shared.pendingContext = context
             iCloudSyncManager.shared.startMonitoring(with: self.container)
             setupDeleteTrackerAfterSync()
@@ -299,6 +300,7 @@ class SharedContainer {
     @MainActor
     private func replayDeletesAfterCloudSync(reason: String) {
         Task {
+            ClothingConditionRepair.repair(context: container.mainContext)
             let reconciledFinalPayments = WealthSavingLedger.reconcilePaidFinalPayments(context: container.mainContext)
             if reconciledFinalPayments > 0 {
                 widgetLogger.info("final_payment_reconcile reason=\(reason) count=\(reconciledFinalPayments)")
@@ -391,7 +393,8 @@ class SharedContainer {
         
         do {
             // 1. Fetch Data (只获取未删除的数据)
-            let descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
+            var descriptor = FetchDescriptor<Clothing>(predicate: #Predicate { $0.deletedAt == nil }, sortBy: [SortDescriptor(\.purchaseDate, order: .reverse)])
+            descriptor.relationshipKeyPathsForPrefetching = [\Clothing.accessoryItems]
             let clothings = try context.fetch(descriptor)
             
             // 2. Calculate Stats

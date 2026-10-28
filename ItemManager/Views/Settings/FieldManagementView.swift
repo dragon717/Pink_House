@@ -22,31 +22,35 @@ struct FieldManagementView: View {
     @State private var editText = ""
     @State private var showingDeleteAlert = false
     
+    private var isPhysicalCondition: Bool { keyPath == \Clothing.physicalCondition }
+
     var body: some View {
         List {
             ForEach(items, id: \.self) { item in
                 HStack {
                     Text(item)
                     Spacer()
-                    Button(action: {
-                        selectedItem = item
-                        editText = item
-                        isEditing = true
-                    }) {
-                        Image(systemName: "pencil")
-                            .foregroundStyle(.blue)
-                    }
-                    .buttonStyle(BorderlessButtonStyle())
-                    .padding(.trailing, 10)
+                    if !isPhysicalCondition {
+                        Button(action: {
+                            selectedItem = item
+                            editText = item
+                            isEditing = true
+                        }) {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
+                        .padding(.trailing, 10)
                     
-                    Button(action: {
-                        selectedItem = item
-                        showingDeleteAlert = true
-                    }) {
-                        Image(systemName: "trash")
-                            .foregroundStyle(.red)
+                        Button(action: {
+                            selectedItem = item
+                            showingDeleteAlert = true
+                        }) {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
                     }
-                    .buttonStyle(BorderlessButtonStyle())
                 }
             }
         }
@@ -80,6 +84,10 @@ struct FieldManagementView: View {
     }
     
     private func loadItems() {
+        if isPhysicalCondition {
+            items = ClothingCondition.options
+            return
+        }
         var uniqueItems = Set<String>()
         
         for clothing in clothings {
@@ -100,7 +108,7 @@ struct FieldManagementView: View {
     }
     
     private func updateItem(oldItem: String, newItem: String) {
-        guard !newItem.isEmpty else { return }
+        guard !isPhysicalCondition, !newItem.isEmpty else { return }
         
         for clothing in clothings {
             let currentValue = clothing[keyPath: keyPath]
@@ -126,6 +134,7 @@ struct FieldManagementView: View {
     }
     
     private func deleteItem(_ item: String) {
+        guard !isPhysicalCondition else { return }
         for clothing in clothings {
             let currentValue = clothing[keyPath: keyPath]
             

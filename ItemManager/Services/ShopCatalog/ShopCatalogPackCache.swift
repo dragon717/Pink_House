@@ -222,6 +222,15 @@ nonisolated enum ShopCatalogPackCache {
         return url
     }
 
+    /// 只移除可重下的媒体缓存；衣橱持久化图片由 ImageManager 独立管理。
+    static func removeCachedMedia(contentHash: String) {
+        var index = loadMediaIndex()
+        if let name = index.removeValue(forKey: contentHash) {
+            try? FileManager.default.removeItem(at: mediaDirectory.appendingPathComponent(name))
+        }
+        saveMediaIndex(index)
+    }
+
     private static func loadMediaIndex() -> [String: String] {
         guard let data = try? Data(contentsOf: mediaIndexURL) else { return [:] }
         return (try? JSONDecoder().decode([String: String].self, from: data)) ?? [:]

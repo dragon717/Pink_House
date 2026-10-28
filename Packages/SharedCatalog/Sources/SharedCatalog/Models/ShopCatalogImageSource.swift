@@ -6,6 +6,13 @@ public struct ShopCatalogImageSource: Hashable, Sendable {
     public let references: [String]
     public let mediaKey: String?
 
+    /// canonical 原图优先，其次是原图 / 预览图 / 缩略图中的其它云端候选。
+    public var mediaKeys: [String] {
+        var seen = Set<String>()
+        return ([mediaKey] + references.map { ShopCatalogSyncProtocol.mediaContentHash(in: $0) })
+            .compactMap { $0 }.filter { seen.insert($0).inserted }
+    }
+
     public static func resolve(_ reference: String?, mediaKey: String? = nil,
                                asset: (String) -> CatalogAsset?) -> Self {
         func clean(_ value: String?) -> String? {

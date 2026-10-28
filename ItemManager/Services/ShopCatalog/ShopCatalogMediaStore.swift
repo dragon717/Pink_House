@@ -20,6 +20,7 @@
 //
 
 import Foundation
+import SharedCatalog
 
 @MainActor
 final class ShopCatalogMediaStore {
@@ -32,6 +33,12 @@ final class ShopCatalogMediaStore {
     private var inFlight: [String: Task<URL?, Never>] = [:]
     /// 本次会话内已确认失败的摘要（不再重试）
     private var failed: Set<String> = []
+    private struct ValidatedCache: Equatable {
+        let url: URL
+        let size: Int
+        let modified: Date
+    }
+    private var validatedCache: [String: ValidatedCache] = [:]
 
     init(reader: any ShopCatalogPublicReading = ShopCatalogPublicCloudReader()) {
         self.reader = reader
@@ -49,8 +56,8 @@ final class ShopCatalogMediaStore {
     /// 调用方应当先用 `ShopCatalogSyncProtocol.resolvedMediaKey(_:fallbackReferences:)`
     /// 把 `mediaKey` 与旧 `thmedia:` 引用归一，再进这里。
     func resolvedURL(mediaKey: String?) async -> URL? {
-        guard let hash = mediaKey else { return nil }
-        if let cached = ShopCatalogPackCache.cachedMediaURL(contentHash: hash) { return cached }
+        guard let hash = mediaKey, ShopCatalogSyncProtocol.isPayloadHash(hash) else { return nil }
+        if let cached = validatedCachedURL(hash) { return cached }
         if failed.contains(hash) { return nil }
         if let task = inFlight[hash] { return await task.value }
 
@@ -79,13 +86,39 @@ final class ShopCatalogMediaStore {
     private func download(_ hash: String) async -> URL? {
         do {
             let data = try await reader.fetchMedia(contentHash: hash)
+            guard ShopCatalogSyncProtocol.sha256Hex(data) == hash,
+                  ShopCatalogMediaStaging.rejectionReason(forStoredBytes: data) == nil else {
+                throw ShopCatalogWardrobeImageImporter.ImportError.unavailable
+            }
             let url = try ShopCatalogPackCache.installMedia(
                 data, contentHash: hash, fileExtension: Self.inferredFileExtension(data))
+            if let stamp = cacheStamp(url) { validatedCache[hash] = stamp }
             return url
         } catch {
             print("[ShopCatalogSync] 媒体下载失败 \(hash.prefix(12))：\(error.localizedDescription)")
             return nil
         }
+    }
+
+    private func cacheStamp(_ url: URL) -> ValidatedCache? {
+        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+              let size = values.fileSize, let modified = values.contentModificationDate else { return nil }
+        return ValidatedCache(url: url, size: size, modified: modified)
+    }
+
+    private func validatedCachedURL(_ hash: String) -> URL? {
+        guard let url = ShopCatalogPackCache.cachedMediaURL(contentHash: hash) else { return nil }
+        let stamp = cacheStamp(url)
+        if let stamp, validatedCache[hash] == stamp { return url }
+        if let data = try? Data(contentsOf: url), ShopCatalogSyncProtocol.sha256Hex(data) == hash,
+           ShopCatalogMediaStaging.rejectionReason(forStoredBytes: data) == nil {
+            validatedCache[hash] = stamp
+            return url
+        }
+        // 旧缓存或中断写入损坏时，清掉后重新下载，不能永久命中坏文件。
+        validatedCache[hash] = nil
+        ShopCatalogPackCache.removeCachedMedia(contentHash: hash)
+        return nil
     }
 
     /// 缓存文件后缀（按魔数判定；UIImage 不靠后缀解码，这里只为文件名可读 / 便于排查）

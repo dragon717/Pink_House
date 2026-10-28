@@ -86,6 +86,19 @@ struct WardrobeCellSnapshot: Identifiable, Equatable, Sendable {
         )
     }
 
+    /// 付款状态变化后立即刷新标签和价格，不能沿用异步重算前的卡片快照。
+    @MainActor
+    static func current(clothing: Clothing, cached: Self?) -> Self {
+        guard let cached,
+              cached.isDepositPlan == clothing.isDepositPlan,
+              cached.isFullPaymentReservation == clothing.isFullPaymentReservation,
+              cached.isSold == (clothing.reservationKind == .sold),
+              cached.isResaleTransfer == clothing.isResaleTransfer else {
+            return Self(clothing: clothing)
+        }
+        return cached
+    }
+
     @MainActor
     init(clothing: Clothing) {
         self.id = clothing.id

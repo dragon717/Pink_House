@@ -4,7 +4,7 @@ import SwiftUI
 //
 //  系列对外只保留一条主链路（系列详情页的合并大卡 → 本页）：整卡进入后
 //  按品类（JSK / KC / 小物 / 包…）分区列出全部单品，明码标价、各带商品照；
-//  勾选任意单品合并到同一次加入操作（同一链路下）。
+//  勾选任意单品后，可一次确认分别入橱，也可合并加入。
 //  规格图文绑定：选中某个配色规格时，该行展示区同步切换为该规格绑定的照片
 //  （variant.imageAssetID；未绑定规格图的沿用商品首图）。
 //
@@ -20,7 +20,7 @@ struct ShopCatalogSeriesMenuView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(ThemeManager.self) private var themeManager
 
-    /// 勾选的单品（合并到同一次加入操作）
+    /// 勾选的单品（整批保存成功后移除本次已保存的商品）
     @State private var checked: Set<String> = []
     /// 各单品当前选中的配色（规格图文绑定 + 记录规格）
     @State private var selectedColor: [String: String] = [:]
@@ -31,6 +31,7 @@ struct ShopCatalogSeriesMenuView: View {
     /// 用户自选的加购价格口径（预约结束后双价并存的卡片可改；缺省走阶段默认）
     @State private var priceChoiceByProduct: [String: ShopCatalogCardPriceChoice] = [:]
     @State private var showsMerge = false
+    @State private var individualAddition: ShopCatalogWardrobeIndividualAddition?
     /// 大图预览：正在查看的单品（点击行内缩略图弹出，关闭即返回原页面）
     @State private var viewerProduct: CatalogProduct?
 
@@ -72,7 +73,7 @@ struct ShopCatalogSeriesMenuView: View {
             .sheet(isPresented: $showsMerge) {
                 NavigationStack {
                     ShopCatalogWardrobeMergeView(
-                        selectedProductIDs: checked.sorted(),
+                        selectedProductIDs: products.filter { checked.contains($0.id) }.map(\.id),
                         priceChoices: checked.reduce(into: [:]) { dict, id in
                             if let p = store.product(id: id) { dict[id] = effectiveChoice(for: p) }
                         },
@@ -86,6 +87,24 @@ struct ShopCatalogSeriesMenuView: View {
                     ) { _ in
                         checked = []
                     }
+                }
+                .presentationDetents([.large])
+            }
+            .sheet(item: $individualAddition) { addition in
+                ShopCatalogWardrobeIndividualAdditionView(
+                    addition: addition,
+                    priceChoices: Dictionary(uniqueKeysWithValues: checkedProducts.map {
+                        ($0.id, effectiveChoice(for: $0))
+                    }),
+                    colorByProduct: checkedProducts.reduce(into: [:]) {
+                        $0[$1.id] = selectionColor(for: $1)
+                    },
+                    sizeByProduct: checkedProducts.reduce(into: [:]) {
+                        $0[$1.id] = effectiveSize(for: $1)
+                    },
+                    store: store
+                ) { productIDs in
+                    checked.subtract(productIDs)
                 }
                 .presentationDetents([.large])
             }
@@ -105,6 +124,9 @@ struct ShopCatalogSeriesMenuView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(themeManager.secondaryTextColor)
             Text("同款不同色合并为一张卡片；点颜色 / 尺码选择规格，双价并存可自选现货 / 预约价加入")
+                .font(.caption)
+                .foregroundStyle(themeManager.tertiaryTextColor)
+            Text("勾选后可一键分别加入衣橱，或合并加入少女衣橱".appLocalized)
                 .font(.caption)
                 .foregroundStyle(themeManager.tertiaryTextColor)
         }
@@ -537,34 +559,52 @@ struct ShopCatalogSeriesMenuView: View {
     }
 
     private var selectionBar: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
+        VStack(spacing: 10) {
+            HStack {
                 Text("已选 \(checked.count) 件")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(themeManager.primaryTextColor)
+                Spacer()
                 if !checked.isEmpty {
                     Text("合计约 \(ShopCatalogFormat.price(checkedTotal))")
                         .font(.caption)
                         .foregroundStyle(themeManager.secondaryTextColor)
                 }
             }
-            Spacer()
-            Button {
-                guard !checked.isEmpty else { return }
-                showsMerge = true
-            } label: {
-                Text("勾选合并加入少女衣橱")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(checked.isEmpty ? Color.gray.opacity(0.5) : Color.pink))
+            HStack(spacing: 12) {
+                Button {
+                    guard !checkedProducts.isEmpty else { return }
+                    individualAddition = .init(productIDs: checkedProducts.map(\.id))
+                } label: {
+                    Text("逐件加入".appLocalized)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(themeManager.accentTextColor)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Capsule().fill(themeManager.accentTextColor.opacity(0.12)))
+                }
+                .accessibilityIdentifier("catalog.wardrobe.individual")
+                Button {
+                    guard !checked.isEmpty else { return }
+                    showsMerge = true
+                } label: {
+                    Text("合并加入".appLocalized)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(Capsule().fill(checked.isEmpty ? Color.gray.opacity(0.5) : Color.pink))
+                }
+                .accessibilityIdentifier("catalog.wardrobe.merge")
             }
+            .buttonStyle(.plain)
             .disabled(checked.isEmpty)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
+    }
+
+    private var checkedProducts: [CatalogProduct] {
+        products.filter { checked.contains($0.id) }
     }
 
     /// 勾选合计（按生效价格口径：现货价 / 预约价；缺价计 0）

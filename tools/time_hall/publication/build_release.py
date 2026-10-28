@@ -480,6 +480,13 @@ def collect_shop_catalog_media(
     for item in rewritten.get("sizeCharts") or []:
         if isinstance(item, dict) and item.get("sourceImage"):
             item["sourceImage"] = rewrite(item["sourceImage"])
+    # rewrite 只处理 local/thmedia，资源 ID 原样保留，避免把 ID 错换成摘要。
+    for item in rewritten.get("products") or []:
+        if isinstance(item, dict) and "images" in item:
+            item["images"] = [rewrite(value) for value in item.get("images") or []]
+    for item in rewritten.get("variants") or []:
+        if isinstance(item, dict) and item.get("imageAssetID"):
+            item["imageAssetID"] = rewrite(item["imageAssetID"])
 
     if missing:
         unique = sorted(set(missing))

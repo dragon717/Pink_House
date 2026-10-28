@@ -194,7 +194,8 @@ public nonisolated enum ShopCatalogPublicationGate {
         strict: ShopCatalogStrictPolicy = .compatibility,
         strictScope: Set<String> = [],
         verifiedRemoteMediaKeys: Set<String> = [],
-        targetEnvironmentName: String = ""
+        targetEnvironmentName: String = "",
+        stagedBytes: ((String) -> Data?)? = nil
     ) -> ShopCatalogPublicationReview {
         var review = ShopCatalogPublicationReview()
         review.catalogIssues = ShopCatalogCloudSyncValidator.structuralIssues(
@@ -207,6 +208,7 @@ public nonisolated enum ShopCatalogPublicationGate {
         var remoteKeys: Set<String> = []
         var unverifiedKeys: Set<String> = []
         var strictBlocked = 0
+        var checkedFiles = Set<String>()
         let environmentSuffix = targetEnvironmentName.isEmpty ? "" : "（\(targetEnvironmentName)）"
 
         func isInStrictScope(_ finding: ShopCatalogMediaReferenceFinding) -> Bool {
@@ -222,6 +224,15 @@ public nonisolated enum ShopCatalogPublicationGate {
                 // 文件在 staging 里 → 发布端会把它上传成 THMedia 并改写引用。
                 // 这是**正常中间态**（Mac 工具的全部意义就是走到这一步），不阻断。
                 required.insert(fileName)
+                if let stagedBytes, checkedFiles.insert(fileName).inserted {
+                    if let bytes = stagedBytes(fileName) {
+                        if let reason = ShopCatalogMediaStaging.rejectionReason(forStoredBytes: bytes) {
+                            review.blockingIssues.append("\(finding.owner) 的图片「\(fileName)」不可发布：\(reason)。")
+                        }
+                    } else {
+                        review.blockingIssues.append("\(finding.owner) 的图片「\(fileName)」无法读取，不能发布。")
+                    }
+                }
             case .missingLocal(let fileName):
                 review.blockingIssues.append(
                     "\(finding.owner) 引用的图片「\(fileName)」在本机找不到文件，无法上传。"

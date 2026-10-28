@@ -8,7 +8,8 @@ enum ShopCatalogImageLoader {
     static func load(_ source: ShopCatalogImageSource,
                              mediaStore: ShopCatalogMediaStore,
                              session: URLSession) async throws -> UIImage {
-        if let key = source.mediaKey {
+        for key in source.mediaKeys {
+            try Task.checkCancellation()
             mediaStore.clearSessionFailure(mediaKey: key)
             if let url = await mediaStore.resolvedURL(mediaKey: key),
                let image = UIImage(contentsOfFile: url.path) {
@@ -16,6 +17,7 @@ enum ShopCatalogImageLoader {
             }
         }
         for reference in source.references {
+            try Task.checkCancellation()
             guard let url = ShopCatalogImageResolver.url(for: reference) else { continue }
             if url.isFileURL, let image = UIImage(contentsOfFile: url.path) {
                 return image

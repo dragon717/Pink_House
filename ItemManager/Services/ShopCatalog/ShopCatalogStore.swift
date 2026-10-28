@@ -741,7 +741,7 @@ struct ShopCatalogAssetImage: View {
     @State private var remoteMediaURL: URL?
     /// 下载过且失败：本次展示周期内不再重试（列表滚动会反复触发 task）
     @State private var remoteMediaFailed = false
-    @State private var loadedMediaKey: String?
+    @State private var loadedImageSource: ShopCatalogImageSource?
     /// http(s) 老引用的重载令牌 —— 点按重试时换一个 identity，
     /// 逼 `AsyncImage` 重新发请求（同一个 URL 它不会自己重试）
     @State private var asyncImageReloadToken = UUID()
@@ -769,7 +769,7 @@ struct ShopCatalogAssetImage: View {
                 }
             })
             .id(asyncImageReloadToken)
-        } else if remoteMediaFailed && loadedMediaKey == resolvedSource.mediaKey {
+        } else if remoteMediaFailed && loadedImageSource == resolvedSource {
             // 本地兜底图也解不出来、远端又下失败 → 必须是「加载失败」而不是「没有图」（方案 §5）
             failedPlaceholder
         } else {
@@ -778,18 +778,24 @@ struct ShopCatalogAssetImage: View {
     }
 
     private func loadRemoteMediaIfNeeded() async {
-        let key = resolvedSource.mediaKey
-        if loadedMediaKey != key {
+        let source = resolvedSource
+        if loadedImageSource != source {
             remoteMediaURL = nil
             remoteMediaFailed = false
-            loadedMediaKey = key
+            loadedImageSource = source
         }
-        guard let key else { return }
+        guard !source.mediaKeys.isEmpty else { return }
         guard !remoteMediaFailed else { return }
-        let url = await ShopCatalogMediaStore.shared.resolvedURL(mediaKey: key)
-        guard !Task.isCancelled, resolvedSource.mediaKey == key else { return }
-        remoteMediaURL = url
-        remoteMediaFailed = url == nil
+        for key in source.mediaKeys {
+            let url = await ShopCatalogMediaStore.shared.resolvedURL(mediaKey: key)
+            guard !Task.isCancelled, resolvedSource == source else { return }
+            if let url {
+                remoteMediaURL = url
+                remoteMediaFailed = false
+                return
+            }
+        }
+        remoteMediaFailed = true
     }
 
     /// 点按重试（iOS 运营上传实施方案 §5 的「重试入口」）。
@@ -800,7 +806,7 @@ struct ShopCatalogAssetImage: View {
     ///      表现成「点了没反应」；
     ///   2. 换 `asyncImageReloadToken`，让 http(s) 老引用的 `AsyncImage` 重建。
     private func retryLoading() {
-        if let key = resolvedSource.mediaKey {
+        for key in resolvedSource.mediaKeys {
             ShopCatalogMediaStore.shared.clearSessionFailure(mediaKey: key)
         }
         remoteMediaFailed = false
@@ -813,7 +819,7 @@ struct ShopCatalogAssetImage: View {
     }
 
     private var remoteMediaPath: String? {
-        loadedMediaKey == resolvedSource.mediaKey ? remoteMediaURL?.path : nil
+        loadedImageSource == resolvedSource ? remoteMediaURL?.path : nil
     }
 
     private var localImage: UIImage? {

@@ -11,6 +11,7 @@
 
 import XCTest
 import Combine
+import UIKit
 @testable import ItemManager
 
 @MainActor
@@ -649,7 +650,10 @@ final class ShopCatalogCloudSyncTests: XCTestCase {
 
     /// 往返：引用改写 → 按需下载 → 落盘 → 命中缓存不再打网络
     func testRemoteMediaResolvesDownloadsAndCaches() async throws {
-        let jpeg = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01])
+        let jpeg = try XCTUnwrap(UIGraphicsImageRenderer(size: CGSize(width: 12, height: 9)).image { context in
+            UIColor.systemPink.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 12, height: 9))
+        }.jpegData(compressionQuality: 0.85))
         let hash = ShopCatalogSyncProtocol.sha256Hex(jpeg)
         let reference = ShopCatalogSyncProtocol.mediaReference(contentHash: hash)
 

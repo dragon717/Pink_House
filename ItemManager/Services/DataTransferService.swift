@@ -59,7 +59,7 @@ class DataTransferService {
                     self.escapeCSV(item.colors),
                     self.escapeCSV(item.sizes),
                     self.escapeCSV(item.length),
-                    self.escapeCSV(item.condition),
+                    self.escapeCSV(item.physicalCondition),
                     self.escapeCSV(item.accessories),
                     "\(item.originalPrice)",
                     "\(item.originalPriceJPY)",

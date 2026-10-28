@@ -396,94 +396,32 @@ private enum VirtualCurrencyDestination: Identifiable, Equatable {
 // MARK: - 透明物理货币容器
 
 struct VirtualCoinPhysicsContainer: View {
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.scenePhase) var scenePhase
-    @Environment(\.isSimulationActive) var isSimulationActive
-    @Environment(\.isWealthStorageActive) var isWealthStorageActive
-
-    @StateObject private var mediaStateManager = MediaStateManager.shared
-    @State private var scene: VirtualCoinScene?
-    @State private var isViewVisible: Bool = false
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isSimulationActive) private var isSimulationActive
+    @Environment(\.isWealthStorageActive) private var isWealthStorageActive
+    @ObservedObject private var mediaStateManager = MediaStateManager.shared
 
     let meowCoinCount: Int
     let fishCoinCount: Int
     let boneCoinCount: Int
 
-    // 计算是否应该暂停
-    private var shouldPause: Bool {
-        !isViewVisible || scenePhase != .active || !isSimulationActive || !isWealthStorageActive || mediaStateManager.isPhysicsPaused
+    private var isActive: Bool {
+        scenePhase == .active && isSimulationActive && isWealthStorageActive && !mediaStateManager.isPhysicsPaused
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            SpriteView(
-                scene: createScene(size: proxy.size),
-                isPaused: shouldPause,
-                options: [.allowsTransparency]
-            )
-            .background(Color.clear)
-            .onAppear {
-                isViewVisible = true
-                HapticEngineManager.shared.resumeHaptics()
-            }
-            .onDisappear {
-                isViewVisible = false
-                scene?.pauseSimulation()
-                HapticEngineManager.shared.stopHaptics()
-                SoundManager.shared.stopAllSounds()
-            }
-            .onChange(of: meowCoinCount) { _, newValue in
-                scene?.updateMeowCoins(count: newValue)
-            }
-            .onChange(of: fishCoinCount) { _, newValue in
-                scene?.updateFishCoins(count: newValue)
-            }
-            .onChange(of: boneCoinCount) { _, newValue in
-                scene?.updateBoneCoins(count: newValue)
-            }
-            .onChange(of: colorScheme) { _, newScheme in
-                scene?.updateBackgroundColor(for: newScheme)
-            }
-            .onChange(of: shouldPause) { _, newValue in
-                if newValue {
-                    scene?.pauseSimulation()
-                } else {
-                    scene?.resumeSimulation()
-                }
-            }
+        WealthPhysicsSurface(isActive: isActive, makeScene: { VirtualCoinScene(size: $0) }) { scene, _ in
+            scene.updateMeowCoins(count: meowCoinCount)
+            scene.updateFishCoins(count: fishCoinCount)
+            scene.updateBoneCoins(count: boneCoinCount)
         }
-    }
-
-    private func createScene(size: CGSize) -> SKScene {
-        if let existingScene = scene {
-            if existingScene.size != size {
-                existingScene.size = size
-            }
-            return existingScene
-        }
-
-        let newScene = VirtualCoinScene(size: size)
-        newScene.scaleMode = .aspectFill
-        newScene.updateBackgroundColor(for: colorScheme)
-
-        // 初始化货币数量
-        newScene.updateMeowCoins(count: meowCoinCount)
-        newScene.updateFishCoins(count: fishCoinCount)
-        newScene.updateBoneCoins(count: boneCoinCount)
-
-        DispatchQueue.main.async {
-            if self.scene == nil {
-                self.scene = newScene
-            }
-        }
-
-        return newScene
+        .accessibilityIdentifier("wealth.virtual.physics")
     }
 }
 
 // MARK: - 虚拟币物理场景
 
-class VirtualCoinScene: SKScene, SKPhysicsContactDelegate {
+class VirtualCoinScene: SKScene, SKPhysicsContactDelegate, WealthPhysicsScene {
     private let motionManager = CMMotionManager()
 
     // 配置参数
@@ -514,19 +452,19 @@ class VirtualCoinScene: SKScene, SKPhysicsContactDelegate {
 
     // 兑换比例：1喵币=1实体喵币，1000鱼币=1实体鱼币，1000骨头币=1实体骨头币
     func updateMeowCoins(count: Int) {
-        self.targetMeowCount = min(count, maxCoinsPerType)
+        self.targetMeowCount = max(0, min(count, maxCoinsPerType))
     }
 
     func updateFishCoins(count: Int) {
         // 1000虚拟鱼币 = 1实体鱼币
         let entityCount = count / 1000
-        self.targetFishCount = min(entityCount, maxCoinsPerType)
+        self.targetFishCount = max(0, min(entityCount, maxCoinsPerType))
     }
 
     func updateBoneCoins(count: Int) {
         // 1000虚拟骨头币 = 1实体骨头币
         let entityCount = count / 1000
-        self.targetBoneCount = min(entityCount, maxCoinsPerType)
+        self.targetBoneCount = max(0, min(entityCount, maxCoinsPerType))
     }
 
     func pauseSimulation() {
@@ -546,7 +484,17 @@ class VirtualCoinScene: SKScene, SKPhysicsContactDelegate {
         setupPhysicsBoundary()
         physicsWorld.gravity = CGVector(dx: 0, dy: -9.8)
         physicsWorld.contactDelegate = self
-        startMotionUpdates()
+    }
+
+    override func willMove(from view: SKView) {
+        motionManager.stopDeviceMotionUpdates()
+        isPaused = true
+        super.willMove(from: view)
+    }
+
+    override func didChangeSize(_ oldSize: CGSize) {
+        super.didChangeSize(oldSize)
+        if size.width > 1, size.height > 1 { setupPhysicsBoundary() }
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -770,7 +718,7 @@ class VirtualCoinScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func startMotionUpdates() {
-        guard motionManager.isDeviceMotionAvailable else { return }
+        guard motionManager.isDeviceMotionAvailable, !motionManager.isDeviceMotionActive else { return }
 
         motionManager.deviceMotionUpdateInterval = 0.1
         motionManager.startDeviceMotionUpdates(to: .main) { [weak self] (data, error) in
