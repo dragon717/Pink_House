@@ -2973,42 +2973,6 @@ struct ScrollDropDelegate: DropDelegate {
     }
 }
 
-// MARK: - 从衣橱进入的默认手帐视图
-
-struct BookDetailViewFromWardrobe: View {
-    let book: BookGroup
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedOutfit: Outfit? = nil
-
-    var body: some View {
-        NavigationStack {
-            BookDetailView(
-                book: book,
-                navigationPath: .constant(NavigationPath()),
-                isSidebarVisible: .constant(false),
-                onBack: {
-                    dismiss()
-                },
-                showLeadingToolbar: false,
-                onPageTap: { outfit in
-                    selectedOutfit = outfit
-                }
-            )
-            // 从衣橱进入时的特殊配置
-            .background(LiquidBackground().ignoresSafeArea())
-            .navigationTitle(book.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-        }
-        .sheet(item: $selectedOutfit) { outfit in
-            NavigationStack {
-                PageFlipEditorContainer(initialOutfit: outfit)
-            }
-        }
-    }
-}
-
 // MARK: - 合并为小物选择目标裙装 Sheet
 
 struct MergeToAccessorySheet: View {

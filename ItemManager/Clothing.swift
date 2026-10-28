@@ -25,13 +25,6 @@ enum ClothingPriceCurrency: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var shortName: String {
-        switch self {
-        case .cny: return "人民币"
-        case .jpy: return "日元"
-        }
-    }
-
     var symbol: String {
         switch self {
         case .cny: return "¥"
@@ -576,7 +569,6 @@ enum ClothingConditionRepair {
 }
 
 enum WealthSavingLedger {
-    static let legacyFinalPaymentMigrationSource = "legacy.finalPaymentSavedToWealth"
     @MainActor private static var lastViewReconciliationAt: Date?
 
     private static var viewReconciliationMinimumInterval: TimeInterval {

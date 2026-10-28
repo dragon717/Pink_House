@@ -263,36 +263,6 @@ struct WardrobeCellThemeInputs: Hashable, Sendable {
     }
 }
 
-private struct WardrobeListCellContainer<Content: View>: View {
-    let cornerRadius: CGFloat
-    let padding: CGFloat
-    let themeInputs: WardrobeCellThemeInputs
-    let content: Content
-
-    init(
-        cornerRadius: CGFloat,
-        padding: CGFloat,
-        themeInputs: WardrobeCellThemeInputs = .fallback,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.cornerRadius = cornerRadius
-        self.padding = padding
-        self.themeInputs = themeInputs
-        self.content = content()
-    }
-
-    var body: some View {
-        ZStack {
-            WardrobeListCellBackground(cornerRadius: cornerRadius, themeInputs: themeInputs)
-
-            content
-                .padding(padding)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .shadow(color: .black.opacity(0.02), radius: 1, x: 0, y: 1)
-    }
-}
-
 struct WardrobeListCellBackground: View {
     let cornerRadius: CGFloat
     let themeInputs: WardrobeCellThemeInputs
@@ -311,15 +281,6 @@ struct WardrobeListCellBackground: View {
             )
     }
 }
-
-// 修复 Linter 错误：确保 Clothing 类型可见
-// 注意：Clothing 类型定义在其他文件中，这里需要确保模块访问正确
-// 如果是同一个 Target，通常不需要 import ItemManager，但有时编译器会抽风
-// 我们假设这些类型是存在的，只是临时编译错误。
-// 为了解决 'No such module UIKit'，我们加了 #if canImport。
-// 现在的错误主要是找不到类型，这通常意味着 swift build 或者是 Xcode 的索引问题。
-// 但根据之前的上下文，这些类型是存在的。
-// 无论如何，我先恢复代码，确保没有语法错误。
 
 struct ClothingCard: View, Equatable {
     static func == (lhs: ClothingCard, rhs: ClothingCard) -> Bool {

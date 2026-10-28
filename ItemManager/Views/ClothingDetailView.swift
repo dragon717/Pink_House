@@ -965,20 +965,12 @@ struct ClothingDetailView: View {
         }
     }
 
-    private func moneyString(_ value: Decimal) -> String {
-        NSDecimalNumber(decimal: value).stringValue
-    }
-
     private func detailNumberText(_ value: Decimal) -> String {
         value.formatted(
             .number
                 .precision(.fractionLength(0...2))
                 .locale(LanguageManager.shared.locale)
         )
-    }
-
-    private func formattedRecordDate(_ date: Date?) -> String {
-        date?.formatted(.dateTime.year().month().day().locale(LanguageManager.shared.locale)) ?? "已记录".appLocalized
     }
 
     /// 购买信息卡片 - 使用统一配色

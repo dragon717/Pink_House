@@ -69,11 +69,6 @@ final class ShopCatalogMediaStore {
         return url
     }
 
-    /// 测试用：清空本次会话的失败记忆
-    func resetSessionFailuresForTesting() {
-        failed.removeAll()
-    }
-
     /// 清掉某个摘要的「本次会话内已失败」记忆，让下一次 `resolvedURL` 重新尝试。
     ///
     /// 供 UI 的「重试」入口调用（iOS 运营上传实施方案 §5：下载失败必须显示明确占位

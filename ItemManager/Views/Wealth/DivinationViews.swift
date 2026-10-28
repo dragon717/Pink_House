@@ -305,38 +305,3 @@ struct FortuneInterpretationView: View {
         .padding(.horizontal, 32)
     }
 }
-
-// MARK: - 签条视图
-
-struct FortuneStickView: View {
-    let fortune: Fortune
-    
-    var body: some View {
-        ZStack {
-            // 签条主体
-            RoundedRectangle(cornerRadius: 8)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.95, green: 0.9, blue: 0.8),
-                            Color(red: 0.9, green: 0.85, blue: 0.75)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 40, height: 120)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(red: 0.6, green: 0.4, blue: 0.2), lineWidth: 2)
-                )
-                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-            
-            // 签文
-            Text(fortune.text.prefix(2))
-                .font(.system(size: 20, weight: .bold, design: .serif))
-                .foregroundStyle(Color(red: 0.6, green: 0.2, blue: 0.1))
-                .rotationEffect(.degrees(-90))
-        }
-    }
-}

@@ -466,14 +466,6 @@ private actor DraftPersistor {
         pendingRequests[key] = nil
     }
 
-    func flushNow(_ draft: ClothingEditDraft, scope: ClothingDraftScope, reason: String) {
-        let key = scope.key
-        pendingTasks[key]?.cancel()
-        pendingTasks[key] = nil
-        pendingRequests[key] = nil
-        persist(ClothingDraftSaveRequest(draft: draft, scope: scope, reason: reason))
-    }
-
     func clear(scope: ClothingDraftScope) {
         cancel(scope: scope)
 
@@ -729,27 +721,6 @@ final class ClothingEditDraftManager: ObservableObject {
         }
     }
 
-    func loadDraft() -> ClothingEditDraft? {
-        guard useFilesystemDrafts else {
-            return loadLegacyDraft()
-        }
-        do {
-            guard let draft = try fileStore.loadCreateDraft() else {
-                print("DraftManager: No draft data found in file store")
-                DraftReliabilitySignpost.draftLoad(scope: "create", source: "none", draftID: nil, imageCount: 0)
-                return nil
-            }
-            DraftReliabilitySignpost.draftLoad(scope: "create", source: "file_create", draftID: draft.id, imageCount: draft.imagePaths.count)
-            print("DraftManager: Loaded draft with ID: \(draft.id), images: \(draft.imagePaths.count)")
-            return draft
-        } catch {
-            DraftReliabilitySignpost.draftLoad(scope: "create", source: "file_decode_failed", draftID: nil, imageCount: 0)
-            AppLogger.error("DraftReliability: Failed to decode create draft: \(error)")
-            print("DraftManager: Failed to decode draft data: \(error)")
-            return nil
-        }
-    }
-
     /// 磁盘读草稿放到后台，避免打开编辑页时主线程硬卡。
     func loadDraftAsync() async -> ClothingEditDraft? {
         guard useFilesystemDrafts else {
@@ -775,18 +746,6 @@ final class ClothingEditDraftManager: ObservableObject {
         }
     }
 
-    func loadDraftID() -> UUID? {
-        guard useFilesystemDrafts else {
-            return loadLegacyDraftID()
-        }
-        guard let draft = loadDraft() else {
-            print("DraftManager: No draftID found in file store")
-            return nil
-        }
-        print("DraftManager: Loaded draftID: \(draft.id)")
-        return draft.id
-    }
-
     func clearDraft() {
         print("DraftManager: Clearing draft")
         currentDraft = nil
@@ -804,10 +763,6 @@ final class ClothingEditDraftManager: ObservableObject {
             AppLogger.error("DraftReliability: Failed to clear create draft file: \(error)")
         }
         print("DraftManager: Draft cleared")
-    }
-
-    func hasDraft() -> Bool {
-        hasPersistedDraft
     }
 
     func refreshDraftPresence() {
@@ -1007,11 +962,6 @@ final class ClothingEditDraftManager: ObservableObject {
             AppLogger.error("DraftReliability: Failed to decode legacy create draft: \(error)")
             return nil
         }
-    }
-
-    private func loadLegacyDraftID() -> UUID? {
-        guard let idString = userDefaults.string(forKey: draftIDKey) else { return nil }
-        return UUID(uuidString: idString)
     }
 
     private func clearLegacyDraft() {

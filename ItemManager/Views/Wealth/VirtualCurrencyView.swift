@@ -236,7 +236,6 @@ class VirtualCoinTextureGenerator {
 // MARK: - 虚拟币物理碰撞类别
 
 struct VirtualCoinPhysicsCategory {
-    static let none: UInt32 = 0
     static let wall: UInt32 = 0b1
     static let coin: UInt32 = 0b10
 }
@@ -711,10 +710,6 @@ class VirtualCoinScene: SKScene, SKPhysicsContactDelegate, WealthPhysicsScene {
         physicsBody?.contactTestBitMask = VirtualCoinPhysicsCategory.coin
         physicsBody?.restitution = 0.2
         physicsBody?.friction = 0.3
-    }
-
-    func updateBackgroundColor(for scheme: ColorScheme) {
-        self.backgroundColor = .clear
     }
 
     private func startMotionUpdates() {

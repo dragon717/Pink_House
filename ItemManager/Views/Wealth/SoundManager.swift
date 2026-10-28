@@ -32,13 +32,10 @@ final class SoundManager: ObservableObject {
     // 1022: CalendarAlert?
     private let impactSoundID: SystemSoundID = 1103 // 较清脆，适合撞击
     private let heavyImpactSoundID: SystemSoundID = 1104 // 较沉闷，适合堆积 (Tock)
-    private let fireworksSoundID: SystemSoundID = 1007 // 暂时使用系统通知音作为替代 (Bang)
     
     // 滚动音效播放器（循环播放）
     private var rollingPlayer: AVAudioPlayer?
     private var fireworksPlayer: AVAudioPlayer?
-    private var pewPlayer: AVAudioPlayer? // Pew Pew 播放器
-    private var isRolling: Bool = false
     
     private init() {
         self.celebrationVolume = UserDefaults.standard.object(forKey: "celebrationVolume") as? Double ?? 1.0
@@ -74,13 +71,6 @@ final class SoundManager: ObservableObject {
             player.stop()
             player.currentTime = 0
         }
-        
-        if let player = pewPlayer, player.isPlaying {
-            player.stop()
-            player.currentTime = 0
-        }
-        
-        isRolling = false
     }
     
     private func prepareAudioSession() {
@@ -125,15 +115,6 @@ final class SoundManager: ObservableObject {
                 createFireworksPlayer(url: generatedUrl)
             }
         }
-        
-        // 4. 加载 Pew 音效
-        if let pewUrl = Bundle.main.url(forResource: "pew", withExtension: "wav") {
-            createPewPlayer(url: pewUrl)
-        } else {
-            if let generatedUrl = AudioGenerator.generatePewSound() {
-                createPewPlayer(url: generatedUrl)
-            }
-        }
     }
     
     private func createFireworksPlayer(url: URL) {
@@ -143,16 +124,6 @@ final class SoundManager: ObservableObject {
             fireworksPlayer?.prepareToPlay()
         } catch {
             print("Failed to load fireworks sound: \(error)")
-        }
-    }
-    
-    private func createPewPlayer(url: URL) {
-        do {
-            pewPlayer = try AVAudioPlayer(contentsOf: url)
-            pewPlayer?.volume = 0.6
-            pewPlayer?.prepareToPlay()
-        } catch {
-            print("Failed to load pew sound: \(error)")
         }
     }
     
@@ -268,23 +239,4 @@ final class SoundManager: ObservableObject {
             player.play()
         }
     }
-    
-    /// 播放 Pew Pew 音效
-    func playPewSound() {
-        guard isSoundEnabled else { return }
-        
-        if let player = pewPlayer {
-            if player.isPlaying {
-                player.stop()
-                player.currentTime = 0
-            }
-            // 随机化音高，增加真实感
-            player.enableRate = true
-            player.rate = Float.random(in: 0.9...1.2)
-            player.volume = Float(celebrationVolume) * 0.6 // 应用音量，保持基础音量比
-            player.play()
-        }
-    }
-    
-
 }

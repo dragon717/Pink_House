@@ -102,28 +102,6 @@ class WardrobeContextManager {
         return triggers.contains { lower.contains($0) }
     }
     
-    func buildPromptWithRelevantWardrobeContext(
-        query: String,
-        clothings: [Clothing],
-        maxItems: Int = 12
-    ) -> String {
-        guard shouldAttachWardrobeContext(for: query) else {
-            return query
-        }
-        
-        let summary = generateWardrobeSummary(clothings: clothings, includeItemList: false)
-        let relevantJSON = generateRelevantItemsJSON(query: query, clothings: clothings, maxItems: maxItems)
-        let vocabularyBlock = buildVocabularyLearningBlock(query: query, clothings: clothings)
-        
-        return """
-        用户问题：\(query)
-        
-        \(composeContextBlock(summary: summary, relevantJSON: relevantJSON, vocabularyBlock: vocabularyBlock))
-        
-        请用自然口语回答，不要复述 JSON 键名，不要输出代码块。
-        """
-    }
-
     func buildWardrobeContextBlockIfNeeded(
         query: String,
         clothings: [Clothing],
@@ -936,34 +914,6 @@ class WardrobeContextManager {
         return "帮我找\(normalized)"
     }
     
-    // 生成单品详细描述 (用于拖拽识别后)
-    func generateItemDetail(clothing: Clothing) -> String {
-        var detail = """
-        【单品详情】
-        名称：\(clothing.name)
-        价格：¥\(NSDecimalNumber(decimal: clothing.price).stringValue)
-        """
-        
-        if clothing.resolvedAccessoriesPrice > 0 {
-            detail += "\n小物总价：¥\(NSDecimalNumber(decimal: clothing.resolvedAccessoriesPrice).stringValue)"
-        }
-        
-        if !clothing.types.isEmpty {
-            detail += "\n类型：\(clothing.types)"
-        }
-        
-        if clothing.isFinalPaymentPlan {
-            detail += "\n状态：预定中 (定金 ¥\(NSDecimalNumber(decimal: clothing.deposit).stringValue), 尾款 ¥\(NSDecimalNumber(decimal: clothing.balance).stringValue))"
-            if let finalDate = clothing.finalPaymentDate {
-                let dateStr = finalDate.formatted(date: .abbreviated, time: .omitted)
-                detail += "\n补款时间：\(dateStr)"
-            }
-        } else if clothing.isFullPaymentReservation {
-            detail += "\n状态：全款预约，待签收"
-        }
-        
-        return detail
-    }
 }
 
 private extension Array where Element: Hashable {

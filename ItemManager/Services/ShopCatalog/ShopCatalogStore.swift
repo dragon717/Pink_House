@@ -106,9 +106,6 @@ final class ShopCatalogStore: ObservableObject {
         rebuildMergedCatalog()
     }
 
-    /// 已通过校验的远端层；普通刷新不会修改运营编辑基线。
-    var installedRemoteCatalog: ShopCatalog? { remoteCatalog }
-
     /// 合并结果只保存本机新增/修改；与远端相同的实体不留副本，后续刷新可继续更新。
     func installMergedCatalog(_ merged: ShopCatalog, remote: ShopCatalog) throws {
         func edits<T: Equatable>(_ values: [T], comparedWith online: [T]) -> [T] {
@@ -274,7 +271,7 @@ final class ShopCatalogStore: ObservableObject {
 
     /// 根因说明：catalog 里的数组是**录入顺序 / JSON 顺序**，不是字典序。
     /// 任何要按名称展示的列表（运营端实体管理、补录草稿的店家/系列选择器等）
-    /// 都必须走这三个访问器或 `AZIndexGrouping.groups`，禁止直接遍历原始数组。
+    /// 都必须走对应访问器或 `AZIndexGrouping.groups`，禁止直接遍历原始数组。
     /// 这里包含已归档实体（运营端需要看到并管理它们）。
     func shopsSortedByName() -> [CatalogShop] {
         AZIndexGrouping.sortedByName(catalog?.shops ?? []) { $0.name }
@@ -282,10 +279,6 @@ final class ShopCatalogStore: ObservableObject {
 
     func seriesSortedByName() -> [CatalogSeries] {
         AZIndexGrouping.sortedByName(catalog?.series ?? []) { $0.name }
-    }
-
-    func productsSortedByName() -> [CatalogProduct] {
-        AZIndexGrouping.sortedByName(catalog?.products ?? []) { $0.name }
     }
 
     /// 店家搜索：正式名包含命中或任一别名包含命中（计划 §8：第一版搜索范围 = 店家名称与别名）

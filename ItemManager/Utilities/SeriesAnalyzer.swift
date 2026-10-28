@@ -70,7 +70,3 @@ final class SeriesAnalyzer {
         return name.isEmpty ? "未命名" : name
     }
 }
-
-extension String {
-    var isNumber: Bool { Double(self) != nil }
-}

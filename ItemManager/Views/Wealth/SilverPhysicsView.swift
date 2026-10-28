@@ -43,11 +43,7 @@ struct SilverPhysicsView: View {
     }
 }
 
-// Reuse PhysicsCategory from GoldPhysicsView or define locally
-// Since they are in the same module, we can reuse if it's public/internal.
-// But to be safe and self-contained:
 struct SilverPhysicsCategory {
-    static let none: UInt32 = 0
     static let wall: UInt32 = 0b1
     static let beanLayer1: UInt32 = 0b10
     static let beanLayer2: UInt32 = 0b100
@@ -188,9 +184,6 @@ class SilverScene: SKScene, SKPhysicsContactDelegate, WealthPhysicsScene {
         )
     }
     
-    func updateBackgroundColor(for scheme: ColorScheme) {
-        self.backgroundColor = .clear
-    }
     
     private func setupPhysicsBoundary() {
         let boundaryRect: CGRect

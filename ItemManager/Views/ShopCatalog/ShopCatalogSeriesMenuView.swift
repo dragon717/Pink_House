@@ -206,11 +206,6 @@ struct ShopCatalogSeriesMenuView: View {
         }
     }
 
-    /// 预约口径的默认已付定金（沿用预约记录上的定金，缺省 0）
-    private func defaultReservationDeposit(for product: CatalogProduct) -> Decimal {
-        store.priceArchive(forProduct: product.id).reservation?.deposit ?? 0
-    }
-
     /// 加购记录的颜色：合并卡片走颜色词标签；未合并单品沿用规格选择。
     /// 颜色取值统一口径 —— 这个值会写进心愿/衣橱记录，必须是真颜色，
     /// 不能拿「整名兜底」充数。
