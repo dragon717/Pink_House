@@ -26,6 +26,7 @@ import SwiftUI
 
 struct OpsPreviewView: View {
     @ObservedObject var workspace: OpsWorkspace
+    var now: Date = Date()
 
     @State private var shopFilter: String = ""
     @State private var searchText: String = ""
@@ -122,8 +123,8 @@ struct OpsPreviewView: View {
                         .padding(.vertical, 1)
                         .background(Color.secondary.opacity(0.14), in: Capsule())
                 }
-                if let phase = series.salePhase {
-                    Text("声明阶段：\(phase.displayName)")
+                if let phase = CatalogSeriesSalePhasePolicy.effectivePhase(of: series, now: now) {
+                    Text("当前阶段：\(phase.displayName)")
                         .font(.caption)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 1)

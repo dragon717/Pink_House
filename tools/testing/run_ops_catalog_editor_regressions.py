@@ -18,6 +18,7 @@ def main():
     snapshots = parser.add_mutually_exclusive_group()
     snapshots.add_argument("--snapshot-dir", type=Path, help="Optional directory for real SwiftUI fixture screenshots")
     snapshots.add_argument("--window-layout-snapshot-dir", type=Path, help="Check minimum window navigation and capture adaptive layouts")
+    snapshots.add_argument("--sale-phase-snapshot-dir", type=Path, help="Check sale phase configuration and live date transitions")
     snapshots.add_argument("--reservation-batch-snapshot-dir", type=Path, help="Only capture the reservation batch upload and review pages")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
@@ -45,6 +46,9 @@ def main():
         elif args.window_layout_snapshot_dir:
             output = json.dumps(str(args.window_layout_snapshot_dir.resolve()), ensure_ascii=False)
             snapshot_call = "try! OpsWindowLayoutSnapshots.run(into: URL(fileURLWithPath: " + output + "))"
+        elif args.sale_phase_snapshot_dir:
+            output = json.dumps(str(args.sale_phase_snapshot_dir.resolve()), ensure_ascii=False)
+            snapshot_call = "try! OpsSalePhaseSnapshots.run(into: URL(fileURLWithPath: " + output + "))"
         if args.interaction_performance_json:
             output = json.dumps(str(args.interaction_performance_json.resolve()), ensure_ascii=False)
             snapshot_call += "\ntry! OpsInteractionPerformance.run(into: URL(fileURLWithPath: " + output + "))"
@@ -83,6 +87,8 @@ import XCTest
             command.append(str(repo / "tools/testing/OpsReservationBatchSnapshots.swift"))
         elif args.window_layout_snapshot_dir:
             command.append(str(repo / "tools/testing/OpsWindowLayoutSnapshots.swift"))
+        elif args.sale_phase_snapshot_dir:
+            command.append(str(repo / "tools/testing/OpsSalePhaseSnapshots.swift"))
         subprocess.run(command, cwd=repo, check=True)
         subprocess.run([str(binary)], cwd=repo, check=True)
 

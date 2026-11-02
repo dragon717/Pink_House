@@ -140,7 +140,9 @@ struct OpsMainView: View {
                     }
                     Divider()
                     GeometryReader { contentGeometry in
-                        content.frame(width: contentGeometry.size.width, height: contentGeometry.size.height)
+                        OpsSeriesPhaseTimeline(series: workspace.catalog.series) { now in
+                            content(at: now).frame(width: contentGeometry.size.width, height: contentGeometry.size.height)
+                        }
                     }
                     .clipped()
                 }
@@ -173,18 +175,18 @@ struct OpsMainView: View {
     }
 
     @ViewBuilder
-    private var content: some View {
+    private func content(at now: Date) -> some View {
         switch section {
         case .seriesEntry:
             OpsSeriesWizardView(workspace: workspace, initialStep: initialWizardStep)
         case .catalog:
-            OpsCatalogEditorView(workspace: workspace)
+            OpsCatalogEditorView(workspace: workspace, now: now)
         case .products:
             OpsProductsView(workspace: workspace)
         case .publishQueue:
             OpsSeriesPublishQueueView(workspace: workspace)
         case .preview:
-            OpsPreviewView(workspace: workspace)
+            OpsPreviewView(workspace: workspace, now: now)
         }
     }
 }

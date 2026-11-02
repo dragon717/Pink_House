@@ -48,6 +48,7 @@ import SwiftUI
 
 struct OpsCatalogEditorView: View {
     @ObservedObject var workspace: OpsWorkspace
+    var now: Date = Date()
 
     @State private var selectedShopID: String?
     @State private var selectedSeriesID: String?
@@ -357,7 +358,7 @@ struct OpsCatalogEditorView: View {
                             .font(.callout.weight(.medium))
                             .foregroundStyle(OpsFlowPalette.textPrimary)
                         OpsFlowChip(
-                            text: series.salePhase?.displayName ?? "未声明",
+                            text: CatalogSeriesSalePhasePolicy.effectivePhase(of: series, now: now)?.displayName ?? "未声明",
                             tint: series.salePhase == nil
                                 ? OpsFlowPalette.textSecondary : OpsFlowPalette.primaryPurple)
                     }
@@ -400,7 +401,7 @@ struct OpsCatalogEditorView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Divider()
                 Text(series.name).font(.callout.weight(.medium)).lineLimit(1)
-                OpsFootnote(text: "发售阶段：\(series.salePhase?.displayName ?? "未声明")　·　"
+                OpsFootnote(text: "发售阶段：\(CatalogSeriesSalePhasePolicy.effectivePhase(of: series, now: now)?.displayName ?? "未声明")　·　"
                             + "价格表：\(series.priceChart == nil ? "无" : "有")")
                 Button {
                     sheet = .seriesConfig(seriesID: series.id)

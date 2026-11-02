@@ -234,12 +234,31 @@ struct SeriesConfigSheet: View {
 
     // MARK: 发售阶段
 
+    /// 保存初始声明与日期；界面选择器显示这一刻实际生效的阶段。
+    private var phasePreview: CatalogSeries {
+        var value = series ?? CatalogSeries(id: seriesID, shopID: "", name: "")
+        value.salePhase = declaresPhase ? phase : nil
+        value.reservationEndAt = hasReservationEnd ? reservationEndAt : nil
+        value.balanceDueKind = balanceDueKind
+        value.balanceDueAt = hasBalanceDueAt ? balanceDueAt : nil
+        value.reservationBatches = reservationBatches.isEmpty ? nil : reservationBatches
+        return value
+    }
+
     private var phaseSection: some View {
+        OpsSeriesPhaseTimeline(series: [phasePreview]) { now in
+            phaseSectionContent(at: now)
+        }
+    }
+
+    private func phaseSectionContent(at now: Date) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("发售阶段").font(.subheadline.weight(.semibold))
             Toggle(isOn: $declaresPhase) { Text("声明发售阶段（不声明 = 由档期推导）") }
             if declaresPhase {
-                Picker("阶段", selection: $phase) {
+                Picker("阶段", selection: Binding(
+                    get: { CatalogSeriesSalePhasePolicy.effectivePhase(of: phasePreview, now: now) ?? phase },
+                    set: { phase = $0 })) {
                     ForEach(CatalogSeriesSalePhase.allCases) { item in
                         Text(item.displayName).tag(item)
                     }
@@ -289,9 +308,9 @@ struct SeriesConfigSheet: View {
                     .font(.caption).foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            OpsFootnote(text: "阶段是「读取时判定」的（`effectivePhase`），不会有定时任务去回写；"
-                        + "所以这里声明的阶段与两个区间就是全部依据。"
-                        + "注意：预约已结束**只改引导，不剥夺能力**。")
+            OpsFootnote(text: "预约结束后自动显示「预约已结束」，等待运营公布尾款安排；"
+                        + "已设置具体尾款开始时间的团次，到点自动显示「尾款中」。"
+                        + "大致时间仅作预计安排，不会提前开启尾款；尾款结束后仍由运营确认是否转为现货。")
             Button {
                 saveSalePhase()
             } label: {

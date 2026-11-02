@@ -71,19 +71,8 @@ nonisolated enum CatalogSeriesSalePhaseResolver {
         balanceDueAt: Date?,
         now: Date
     ) -> CatalogSeriesSalePhase? {
-        guard let declared else { return nil }
-        // 显式声明「尾款中 / 现货」不被时间改写：运营说了算（同 §二 的「不覆盖声明」）
-        guard declared == .reservationActive || declared == .reservationEnded else { return declared }
-
-        if declared == .reservationActive {
-            // 未填结束时间 → 保持预约中；已填且未到 → 保持预约中
-            guard let end = reservationEndAt else { return .reservationActive }
-            guard now > end else { return .reservationActive }
-        }
-        // 走到这里 = 「预约已结束」的时刻已到（或本来就声明为预约已结束）
-        return CatalogSeriesBalanceDue.isDue(kind: balanceDueKind, at: balanceDueAt, now: now)
-            ? .balancePending
-            : .reservationEnded
+        CatalogSeriesSalePhasePolicy.effectivePhase(declared: declared, reservationEndAt: reservationEndAt,
+            balanceDueKind: balanceDueKind, balanceDueAt: balanceDueAt, now: now)
     }
 
     /// 旧签名（不涉及尾款时间）：`effectivePhase(declared:reservationEndAt:now:)`。
@@ -102,20 +91,7 @@ nonisolated enum CatalogSeriesSalePhaseResolver {
 
     /// `CatalogSeries` 便捷入口（唯一读法，视图别再自己拼字段）
     static func effectivePhase(of series: CatalogSeries, now: Date) -> CatalogSeriesSalePhase? {
-        if let batches = series.reservationBatches, !batches.isEmpty {
-            let phases = batches.compactMap { batch in
-                series.paymentSchedule(batchID: batch.id).flatMap { effectivePhase(of: $0, now: now) }
-            }
-            // 系列总览展示已开始收尾款的团；入橱与同步传所选团投影，单独判断。
-            if phases.contains(.balancePending) { return .balancePending }
-            if phases.contains(.reservationActive) { return .reservationActive }
-            return phases.first
-        }
-        return effectivePhase(declared: series.salePhase,
-                       reservationEndAt: series.reservationEndAt,
-                       balanceDueKind: series.balanceDueKind,
-                       balanceDueAt: series.balanceDueAt,
-                       now: now)
+        CatalogSeriesSalePhasePolicy.effectivePhase(of: series, now: now)
     }
 
     /// 是否已经因为「过了预约结束时间 / 到了尾款时间」而自动流转 —— 表单用它给一条提示，
