@@ -1,0 +1,51 @@
+{
+  "fixture" : {
+    "bytesPerFile" : 65536,
+    "entries" : 32,
+    "mediaFiles" : 656,
+    "products" : 431
+  },
+  "metrics" : {
+    "changes_cached" : {
+      "max_ms" : 0.0135,
+      "p50_ms" : 0.001292,
+      "p95_ms" : 0.0015
+    },
+    "changes_legacy" : {
+      "max_ms" : 5.5116670000000001,
+      "p50_ms" : 2.7421669999999998,
+      "p95_ms" : 3.7526660000000001
+    },
+    "media_cached" : {
+      "max_ms" : 0.34679100000000002,
+      "p50_ms" : 0.113625,
+      "p95_ms" : 0.16479199999999999
+    },
+    "media_cold" : {
+      "max_ms" : 26.710750000000001,
+      "p50_ms" : 26.710750000000001,
+      "p95_ms" : 26.710750000000001
+    },
+    "media_legacy" : {
+      "max_ms" : 55.977041,
+      "p50_ms" : 24.523292000000001,
+      "p95_ms" : 31.23075
+    },
+    "validation_cached" : {
+      "max_ms" : 0.096542000000000003,
+      "p50_ms" : 0.011667,
+      "p95_ms" : 0.017375000000000002
+    },
+    "validation_legacy" : {
+      "max_ms" : 110.628542,
+      "p50_ms" : 94.986999999999995,
+      "p95_ms" : 109.17887500000001
+    },
+    "validation_single_edit" : {
+      "max_ms" : 0.55008400000000002,
+      "p50_ms" : 0.109792,
+      "p95_ms" : 0.22700000000000001
+    }
+  },
+  "scope" : "in-process hot paths; excludes display refresh, disk save, network and cold decode"
+}

@@ -14,8 +14,10 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--derived-data", type=Path, required=True)
+    parser.add_argument("--interaction-performance-json", type=Path, help="Compare legacy and optimized interaction hot paths on temporary data")
     snapshots = parser.add_mutually_exclusive_group()
     snapshots.add_argument("--snapshot-dir", type=Path, help="Optional directory for real SwiftUI fixture screenshots")
+    snapshots.add_argument("--window-layout-snapshot-dir", type=Path, help="Check minimum window navigation and capture adaptive layouts")
     snapshots.add_argument("--reservation-batch-snapshot-dir", type=Path, help="Only capture the reservation batch upload and review pages")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
@@ -40,11 +42,20 @@ def main():
         elif args.reservation_batch_snapshot_dir:
             output = json.dumps(str(args.reservation_batch_snapshot_dir.resolve()), ensure_ascii=False)
             snapshot_call = "try! OpsReservationBatchSnapshots.run(into: URL(fileURLWithPath: " + output + "))"
+        elif args.window_layout_snapshot_dir:
+            output = json.dumps(str(args.window_layout_snapshot_dir.resolve()), ensure_ascii=False)
+            snapshot_call = "try! OpsWindowLayoutSnapshots.run(into: URL(fileURLWithPath: " + output + "))"
+        if args.interaction_performance_json:
+            output = json.dumps(str(args.interaction_performance_json.resolve()), ensure_ascii=False)
+            snapshot_call += "\ntry! OpsInteractionPerformance.run(into: URL(fileURLWithPath: " + output + "))"
         runner.write_text("""import Foundation
 import XCTest
 @main struct Runner {
     @MainActor static func main() {
-        let suite = OpsCatalogEditorPersistenceTests.defaultTestSuite
+        let suite = XCTestSuite(name: "OpsWorkspaceRegressions")
+        suite.addTest(OpsCatalogEditorPersistenceTests.defaultTestSuite)
+        suite.addTest(OpsInteractionPerformanceTests.defaultTestSuite)
+        suite.addTest(OpsSeriesPriceChartDraftTests.defaultTestSuite)
         suite.run()
         SNAPSHOT_CALL
         exit(suite.testRun?.hasSucceeded == true && suite.testCaseCount > 0 ? 0 : 1)
@@ -52,7 +63,7 @@ import XCTest
 }
 """.replace("SNAPSHOT_CALL", snapshot_call), encoding="utf-8")
         binary = directory / "regressions"
-        command = ["xcrun", "swiftc", "-swift-version", "5", "-parse-as-library",
+        command = ["xcrun", "swiftc", "-swift-version", "5", "-default-isolation", "MainActor", "-O", "-parse-as-library",
                    "-target", "arm64-apple-macos26.2",
                    "-I", str(products), "-I", str(platform / "usr/lib"),
                    "-F", str(frameworks), "-F", str(platform / "Library/Frameworks"),
@@ -61,11 +72,17 @@ import XCTest
         for path in [frameworks, app / "MacOS", app / "Frameworks", platform / "Library/Frameworks", platform / "usr/lib"]:
             command.extend(["-Xlinker", "-rpath", "-Xlinker", str(path)])
         command.extend([str(repo / "PinkHouseOpsTests/OpsCatalogEditorPersistenceTests.swift"),
+                        str(repo / "PinkHouseOpsTests/OpsInteractionPerformanceTests.swift"),
+                        str(repo / "PinkHouseOpsTests/OpsSeriesPriceChartDraftTests.swift"),
                         str(runner), "-o", str(binary)])
+        if args.interaction_performance_json:
+            command.append(str(repo / "tools/testing/OpsInteractionPerformance.swift"))
         if args.snapshot_dir:
             command.append(str(repo / "tools/testing/OpsCatalogEditorSnapshots.swift"))
         elif args.reservation_batch_snapshot_dir:
             command.append(str(repo / "tools/testing/OpsReservationBatchSnapshots.swift"))
+        elif args.window_layout_snapshot_dir:
+            command.append(str(repo / "tools/testing/OpsWindowLayoutSnapshots.swift"))
         subprocess.run(command, cwd=repo, check=True)
         subprocess.run([str(binary)], cwd=repo, check=True)
 

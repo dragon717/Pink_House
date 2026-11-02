@@ -41,6 +41,22 @@ public enum CatalogChartKind: String, Sendable, CaseIterable {
     /// 预约价格表（行 = 款式，列 = 预约价 / 定金 / 尾款…）
     case price
 
+    /// 新建或补录表格时的默认单位；已有非空单位保持原文。
+    public var defaultUnit: String {
+        switch self {
+        case .size: return "CM"
+        case .price: return "元"
+        }
+    }
+
+    public func unitForEditing(_ storedUnit: String?) -> String {
+        guard let storedUnit,
+              !storedUnit.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return defaultUnit
+        }
+        return storedUnit
+    }
+
     /// 用户可见的图表名。**提示文案必须带上它**——两张表同时录入时，主语不能省。
     public var displayName: String {
         switch self {
@@ -67,12 +83,13 @@ public enum CatalogChartQuality {
         "columns", "header", "note", "notes", "remark", "example",
     ]
 
-    /// 允许出现的纯拉丁词元（尺码 / 常见表头英文），避免把正常英文表头误判成乱码
+    /// 允许出现的纯拉丁词元（尺码 / 常见表头英文 / 配饰名），避免误判正常商品文字
     public static let allowedLatinTokens: Set<String> = [
         "size", "sizes", "item", "color", "colour", "style", "price", "prices",
         "deposit", "balance", "total", "bust", "waist", "hip", "length", "shoulder",
         "sleeve", "chest", "cuff", "hem", "height", "width", "weight", "unit",
         "cn", "us", "uk", "eu", "cm", "mm", "kg", "jpy", "cny", "rmb", "usd",
+        "bnt", // 小物配饰名称，不能因连续大写或无元音被判为 OCR 乱码
     ]
 
     /// 列 / 行 → 可用性。**唯一判定点**。

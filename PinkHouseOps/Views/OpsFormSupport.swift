@@ -154,20 +154,7 @@ struct OpsThumbnail: View {
     var size: CGFloat = 40
 
     var body: some View {
-        Group {
-            if let url, let image = NSImage(contentsOf: url) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                ZStack {
-                    Color.secondary.opacity(0.10)
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
-                        .font(.system(size: size * 0.32))
-                }
-            }
-        }
+        OpsAsyncImage(url: url, pixels: max(128, Int(size * 2)))
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.14))
         .overlay(
@@ -176,15 +163,13 @@ struct OpsThumbnail: View {
     }
 }
 
-/// 点击时冻结图片及路径，让预览首帧直接显示当前图片。
+/// 点击时冻结路径；原图在预览出现后后台解码，不阻塞按钮响应。
 struct OpsImagePreviewSource: Identifiable {
     let id = UUID()
     let url: URL
-    let image: NSImage?
 
     init(url: URL) {
         self.url = url
-        self.image = NSImage(contentsOf: url)
     }
 }
 
@@ -192,6 +177,8 @@ struct OpsImagePreview: View {
     let source: OpsImagePreviewSource
     @Environment(\.dismiss) private var dismiss
     @State private var zoom: CGFloat = 1
+    @State private var image: NSImage?
+    @State private var isLoading = true
 
     var body: some View {
         VStack(spacing: 12) {
@@ -201,7 +188,7 @@ struct OpsImagePreview: View {
                 Spacer()
                 Button("关闭") { dismiss() }.keyboardShortcut(.cancelAction)
             }
-            if let image = source.image {
+            if let image {
                 GeometryReader { geometry in
                     let ratio = min(geometry.size.width / max(image.size.width, 1),
                                     geometry.size.height / max(image.size.height, 1))
@@ -220,6 +207,8 @@ struct OpsImagePreview: View {
                     Text("\(Int(zoom * 100))%").monospacedDigit().frame(width: 48)
                 }
                 .controlSize(.small)
+            } else if isLoading {
+                ProgressView("正在加载图片…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView("无法加载图片", systemImage: "photo",
                     description: Text("图片可能尚未下载或文件已不可用，请关闭后重新上传或同步。"))
@@ -228,6 +217,13 @@ struct OpsImagePreview: View {
         .padding(16)
         .frame(width: 840, height: 640)
         .background(Color(nsColor: .windowBackgroundColor))
+        .task(id: source.url) {
+            isLoading = true
+            let decoded = await OpsImageLoader.shared.load(source.url, pixels: 4096)
+            guard !Task.isCancelled else { return }
+            image = decoded.map { NSImage(cgImage: $0.image, size: .zero) }
+            isLoading = false
+        }
     }
 }
 
@@ -286,6 +282,43 @@ struct OpsImageUploadThumbnail: View {
 
 // MARK: - 表单外壳
 
+#if DEBUG
+/// 离线布局验收读取 SwiftUI 实际布局结果；Release 不包含探针或记录。
+enum OpsWindowLayoutDiagnostics {
+    static var isEnabled = false
+    static var frames: [String: CGRect] = [:]
+}
+#endif
+
+extension View {
+    func opsLayoutProbe(_ identifier: String) -> some View {
+#if DEBUG
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+            if OpsWindowLayoutDiagnostics.isEnabled { OpsWindowLayoutDiagnostics.frames[identifier] = frame }
+        }
+#else
+        self
+#endif
+    }
+}
+
+/// 状态/说明可以增长，但不能抢走业务区与固定操作栏的可用高度。
+struct OpsHeightLimitedScroll<Content: View>: View {
+    let maxHeight: CGFloat
+    @ViewBuilder var content: Content
+    @State private var contentHeight: CGFloat = 0
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) { content }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: min(contentHeight > 0 ? contentHeight : maxHeight, maxHeight))
+    }
+}
+
 /// 统一的表单外壳（标题 + 内容 + 取消/保存）。
 ///
 /// ⚠️ 「保存」的语义是 **命令成功才关窗**（R05）。这条规则由外壳**自己**执行：
@@ -326,7 +359,7 @@ struct OpsFormFrame<Content: View>: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: contentHeight)
+            .frame(minHeight: 100, idealHeight: contentHeight, maxHeight: .infinity)
             HStack {
                 Spacer()
                 Button("取消", action: onCancel)
@@ -337,7 +370,8 @@ struct OpsFormFrame<Content: View>: View {
             }
         }
         .padding(20)
-        .frame(width: width)
+        .frame(minWidth: min(width, 360), idealWidth: width, maxWidth: width,
+               minHeight: 300, idealHeight: contentHeight + 150, maxHeight: contentHeight + 180)
     }
 }
 

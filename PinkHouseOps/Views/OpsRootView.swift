@@ -129,14 +129,22 @@ struct OpsMainView: View {
                 DraftSummaryFooter(workspace: workspace, syncCatalogEdits: section == .catalog)
             }
         } detail: {
-            VStack(spacing: 0) {
-                OpsStatusBanner(workspace: workspace)
-                if workspace.catalogEditSyncProgress != nil {
-                    OpsCatalogEditSyncStatus(workspace: workspace)
-                        .padding(.horizontal, 14).padding(.bottom, 8)
+            GeometryReader { geometry in
+                VStack(spacing: 0) {
+                    OpsHeightLimitedScroll(maxHeight: min(180, geometry.size.height * 0.3)) {
+                        OpsStatusBanner(workspace: workspace)
+                        if workspace.catalogEditSyncProgress != nil {
+                            OpsCatalogEditSyncStatus(workspace: workspace)
+                                .padding(.horizontal, 14).padding(.bottom, 8)
+                        }
+                    }
+                    Divider()
+                    GeometryReader { contentGeometry in
+                        content.frame(width: contentGeometry.size.width, height: contentGeometry.size.height)
+                    }
+                    .clipped()
                 }
-                Divider()
-                content
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
         .frame(minWidth: 980, minHeight: 620)

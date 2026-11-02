@@ -39,7 +39,7 @@ public enum CatalogChartTemplate {
     /// 尺码表模板（7 个数据列 × 5 行）。
     public enum SizeChart {
 
-        public static let unit = "cm"
+        public static let unit = CatalogChartKind.size.defaultUnit
 
         /// 只写数据列：「尺码」是行标签列（渲染时占最左边那一列），不写进列名。
         public static let columnsText = "后衣长, 胸围, 腰围, 肩宽, 袖长, 袖口, 领围"
@@ -75,7 +75,7 @@ public enum CatalogChartTemplate {
         /// ⚠️ 价格表的「单位」是**金额单位**（展示为「单位：元」）。
         /// 尺码表那边的 `cm` 是长度单位，两者不可混用 ——
         /// Mac 价格表卡片原先的 placeholder 写的是「如 cm / inch」，是从尺码表抄过来的。
-        public static let unit = "元"
+        public static let unit = CatalogChartKind.price.defaultUnit
 
         /// 只写数据列：「款式」是行标签列（渲染时占角落那一列），不写进列名。
         public static let columnsText = "预约价, 定金, 尾款, 现货价"

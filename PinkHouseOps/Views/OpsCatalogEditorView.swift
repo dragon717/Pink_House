@@ -61,10 +61,19 @@ struct OpsCatalogEditorView: View {
     var body: some View {
         VStack(spacing: 12) {
             pageHeader
-            HSplitView {
-                shopColumn
-                seriesColumn
-                productColumn
+            GeometryReader { geometry in
+                let shopWidth = min(260, geometry.size.width * 0.26)
+                let seriesWidth = min(300, geometry.size.width * 0.28)
+                HStack(spacing: 0) {
+                    shopColumn
+                        .frame(width: shopWidth, height: geometry.size.height).clipped()
+                    Divider()
+                    seriesColumn
+                        .frame(width: seriesWidth, height: geometry.size.height).clipped()
+                    Divider()
+                    productColumn
+                        .frame(width: max(0, geometry.size.width - shopWidth - seriesWidth - 2), height: geometry.size.height).clipped()
+                }
             }
             .frame(maxHeight: .infinity)
         }
@@ -247,7 +256,7 @@ struct OpsCatalogEditorView: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
         }
-        .frame(minWidth: 210, idealWidth: 240)
+        .frame(minWidth: 180, idealWidth: 240)
     }
 
     /// 店家行（图1 第一步）：粉色瓷片 + 头像圆 + 名称 + 元信息
@@ -255,7 +264,7 @@ struct OpsCatalogEditorView: View {
         OpsFlowTile(color: OpsFlowPalette.tilePink, selected: shop.id == selectedShopID) {
             HStack(spacing: 10) {
                 if let logo = shop.logo,
-                   let url = workspace.stagedFileURL(forReference: workspace.asset(for: logo)?.originalURL ?? logo) {
+                   let url = workspace.previewFileURL(forReference: workspace.asset(for: logo)?.originalURL ?? logo) {
                     OpsThumbnail(url: url, size: 30)
                 } else {
                     ZStack {
@@ -330,7 +339,7 @@ struct OpsCatalogEditorView: View {
             }
             .safeAreaInset(edge: .bottom) { seriesFooter }
         }
-        .frame(minWidth: 210, idealWidth: 240)
+        .frame(minWidth: 180, idealWidth: 240)
     }
 
     /// 系列行（图1 第二步）：瓷片 + 名称 + 年月/商品数 + 发售状态胶囊
@@ -340,7 +349,7 @@ struct OpsCatalogEditorView: View {
                 ? OpsFlowPalette.tileLilac : OpsFlowPalette.tileRed.opacity(0.7),
             selected: series.id == selectedSeriesID) {
             HStack(spacing: 10) {
-                OpsThumbnail(url: workspace.stagedImageURL(forReference: series.cover), size: 44)
+                OpsThumbnail(url: workspace.previewImageURL(forReference: series.cover), size: 44)
                     .accessibilityLabel("系列封面")
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
@@ -486,7 +495,7 @@ struct OpsCatalogEditorView: View {
             }
             .safeAreaInset(edge: .bottom) { productFooter }
         }
-        .frame(minWidth: 280, idealWidth: 320)
+        .frame(minWidth: 240, idealWidth: 320)
     }
 
     private func productRow(_ product: CatalogProduct) -> some View {
@@ -502,7 +511,7 @@ struct OpsCatalogEditorView: View {
         let firstImageAsset = product.images.first.flatMap { id in
             workspace.catalog.assets.first { $0.id == id }
         }
-        let imageURL = firstImageAsset.flatMap { workspace.stagedFileURL(forReference: $0.originalURL) }
+        let imageURL = firstImageAsset.flatMap { workspace.previewFileURL(forReference: $0.originalURL) }
         return OpsFlowTile(color: OpsFlowPalette.tilePink, selected: product.id == selectedProductID) {
             HStack(spacing: 10) {
                 // 商品图（图1 商品卡左侧的图块）；无图 = 占位图标
@@ -1070,9 +1079,9 @@ private struct BindImagesSheet: View {
 
     private func previewURL(for assetID: String) -> URL? {
         guard let asset = workspace.catalog.assets.first(where: { $0.id == assetID }) else { return nil }
-        return workspace.stagedFileURL(forReference: asset.originalURL)
-            ?? workspace.stagedFileURL(forReference: asset.previewURL)
-            ?? workspace.stagedFileURL(forReference: asset.thumbnailURL)
+        return workspace.previewFileURL(forReference: asset.originalURL)
+            ?? workspace.previewFileURL(forReference: asset.previewURL)
+            ?? workspace.previewFileURL(forReference: asset.thumbnailURL)
     }
 }
 

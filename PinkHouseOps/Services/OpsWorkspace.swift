@@ -72,7 +72,16 @@ final class OpsWorkspace: ObservableObject {
     ///     → `markDirty()`），**视图层只读、一行都不许写**；
     ///   · 反馈只写 `statusMessage` / `lastError`（全局 banner 是唯一通道）。
     /// 视图层（`PinkHouseOps/Views/`）当前对这四个字段**全部是读**（已核对）。
-    @Published var catalog = ShopCatalog()
+    @Published var catalog = ShopCatalog() {
+        didSet { catalogGeneration &+= 1 }
+    }
+    private var catalogGeneration: UInt64 = 0
+    private var assetIndexGeneration: UInt64?
+    private var assetIndex: [String: CatalogAsset] = [:]
+    private var cachedBaselineJSON: Data?
+    private var cachedBaseline: ShopCatalog?
+    private var hasLoadedBaselineCache = false
+    private var cachedChanges: (generation: UInt64, baselineJSON: Data?, value: ShopCatalogChangeSet)?
     /// 最近一次导入 / 导出 / 校验的可见反馈（界面上必须有地方显示，
     /// 否则「点了没反应」会被当成功能坏了 —— 计划 §7 的「失败必须可见」）
     @Published var statusMessage: String?
@@ -93,6 +102,16 @@ final class OpsWorkspace: ObservableObject {
     /// 目录保存及完成后的表单归零使用同一持久化入口，失败时保留原输入。
     let saveCatalogContext: (ModelContext) throws -> Void
     let fileManager = FileManager.default
+    private let cachedMediaLookup = OpsCachedMediaLookup()
+    private let previewMediaLookup = OpsPreviewMediaLookup()
+    private var previewMediaDirectory: URL?
+    private var previewMediaModified: Date?
+    private var previewMediaGeneration = UUID()
+    private var previewMediaURLs: [String: URL] = [:]
+    private var previewMediaRequests: [String: Task<Void, Never>] = [:]
+    private var previewMediaCompleted: Set<String> = []
+    private var previewRefreshScheduled = false
+    let entryValidationCache = OpsSeriesEntryValidationCache()
     /// 向导草稿的防抖持久化（每次击键都整包编码太浪费，停顿 0.4s 落一次盘）
     private var seriesEntryPersistCancellable: Any?
 
@@ -191,15 +210,6 @@ final class OpsWorkspace: ObservableObject {
                seen.insert(hash).inserted { output.append(hash) }
         }
         return output
-    }
-
-    /// 引用到了、但**本机还没有字节**的远端媒体摘要（要下载的就是这些）。
-    ///
-    /// 已经在本机的一律跳过：内容寻址的东西重复下载没有意义，
-    /// 而且几百张图每次都全量重下一遍会让「同步」慢到没人愿意点。
-    func remoteMediaHashesMissingLocally() -> [String] {
-        let staged = stagedMediaKeys
-        return referencedRemoteMediaHashes().filter { !staged.contains($0) }
     }
 
     /// 把下载下来的图片字节**收进 staging**。
@@ -395,28 +405,18 @@ final class OpsWorkspace: ObservableObject {
         }
     }
 
-    /// 运营改草稿标题（走统一入口，才能带上版本与失败反馈）
-    @discardableResult
-    func renameDraft(title: String) -> Bool {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let draft, !trimmed.isEmpty else {
-            lastError = "草稿标题不能为空。"
-            return false
-        }
-        guard !draft.isCorrupted else {
-            lastError = "草稿处于只读隔离状态，不能改名。请先「另存为新草稿」。"
-            return false
-        }
-        guard trimmed != draft.title else { return true }
-        draft.title = trimmed
-        markDirty()
-        return saveDraft()
-    }
-
     // MARK: 与基线的差分 / 严格策略的作用域（方案 R07 / R08）
 
     /// 上次确认发布出去的那一版目录快照。nil = 从未确认发布过。
-    var baselineCatalog: ShopCatalog? { draft?.baselineCatalog }
+    var baselineCatalog: ShopCatalog? {
+        let data = draft?.baselineCatalogJSON
+        if !hasLoadedBaselineCache || cachedBaselineJSON != data {
+            cachedBaselineJSON = data
+            cachedBaseline = data.flatMap { try? ShopCatalogJSONCoding.decoder().decode(ShopCatalog.self, from: $0) }
+            hasLoadedBaselineCache = true
+        }
+        return cachedBaseline
+    }
 
     /// 线上基线（只由受控发布器回填 / 运营显式采用）
     var baseline: ShopCatalogBaseline { draft?.baseline ?? ShopCatalogBaseline() }
@@ -426,7 +426,13 @@ final class OpsWorkspace: ObservableObject {
     /// `hasBaseline == false` 时界面**必须**显示「无法比较」——
     /// 把它显示成「没有改动」会让运营以为发一份空改动是安全的。
     var changeSet: ShopCatalogChangeSet {
-        ShopCatalogChangeSetCalculator.diff(baseline: baselineCatalog, current: catalog)
+        let data = draft?.baselineCatalogJSON
+        if let cachedChanges, cachedChanges.generation == catalogGeneration, cachedChanges.baselineJSON == data {
+            return cachedChanges.value
+        }
+        let value = ShopCatalogChangeSetCalculator.diff(baseline: baselineCatalog, current: catalog)
+        cachedChanges = (catalogGeneration, data, value)
+        return value
     }
 
     /// 严格发布策略（R08）的作用域：**本次新增 / 修改过的实体 id**。
@@ -449,27 +455,6 @@ final class OpsWorkspace: ObservableObject {
         }
         return ShopCatalogChangeSetCalculator.diff(baseline: baseline, current: catalog)
             .strictScopeIDs
-    }
-
-    /// 显式把「线上当前版本」采用为这份草稿的基线。
-    ///
-    /// 这是**运营的选择**，不是自动行为：自动回填等于替运营声明
-    /// 「我的草稿一定基于最新线上」，而那正是 R07 要防的假话。
-    /// 采用之后，基线里的旧内容快照会被清掉（我们手上没有线上那份内容），
-    /// 所以严格策略的作用域会暂时按「整份目录」算 —— 这一点在界面上要说出来。
-    func adoptBaseline(_ head: ShopCatalogOnlineHead) {
-        guard let draft else { return }
-        var states = draft.environmentBaselines
-        states.removeValue(forKey: head.environment)
-        draft.environmentBaselines = states
-        draft.baselineCatalog = nil
-        draft.baseline = ShopCatalogBaseline(
-            releaseSeq: head.releaseSeq,
-            rootIndexHash: head.rootIndexHash,
-            environment: head.environment,
-            observedAt: head.observedAt)
-        try? context.save()
-        statusMessage = "已把线上 releaseSeq \(head.releaseSeq) 采用为这份草稿的基线（未改动任何内容）。"
     }
 
     /// 记一次**已回读确认**的发布（由发布中心在拿到回执后调用）。
@@ -987,16 +972,70 @@ final class OpsWorkspace: ObservableObject {
     }
 
     func asset(for id: String) -> CatalogAsset? {
-        catalog.assets.first { $0.id == id }
+        if assetIndexGeneration != catalogGeneration {
+            // 与原 first(where:) 一致：历史重复 ID 取第一项，不因建索引而崩溃。
+            assetIndex = Dictionary(catalog.assets.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            assetIndexGeneration = catalogGeneration
+        }
+        return assetIndex[id]
     }
 
     /// 封面等字段可以是资源 ID，也可以是直接引用；下载后的 canonical 媒体也可显示。
     func stagedImageURL(forReference reference: String?) -> URL? {
+        resolvedImageURL(forReference: reference, lookup: stagedFileURL)
+    }
+
+    func previewImageURL(forReference reference: String?) -> URL? {
+        resolvedImageURL(forReference: reference, lookup: previewFileURL)
+    }
+
+    private func resolvedImageURL(forReference reference: String?, lookup: (String?) -> URL?) -> URL? {
         let source = ShopCatalogImageSource.resolve(reference, asset: { asset(for: $0) })
         let references = source.references + (source.mediaKey.map {
             [ShopCatalogSyncProtocol.mediaReference(contentHash: $0)]
         } ?? [])
-        return references.lazy.compactMap { self.stagedFileURL(forReference: $0) }.first
+        for reference in references {
+            if let url = lookup(reference) { return url }
+        }
+        return nil
+    }
+
+    /// 视图查图：只读快速路径/缓存，首次扫描和核验在后台完成后通知界面。
+    /// 保存、导出等业务命令继续使用 stagedFileURL 的同步核验语义。
+    func previewFileURL(forReference reference: String?) -> URL? {
+        guard let reference, !reference.isEmpty else { return nil }
+        if reference.hasPrefix("local:") { return stagedFileURL(forReference: reference) }
+        guard let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference) else { return nil }
+        let directory = stagingDirectory
+        let modified = (try? fileManager.attributesOfItem(atPath: directory.path))?[.modificationDate] as? Date
+        if previewMediaDirectory != directory || previewMediaModified != modified {
+            for task in previewMediaRequests.values { task.cancel() }
+            previewMediaRequests.removeAll()
+            previewMediaCompleted.removeAll()
+            previewMediaURLs.removeAll()
+            previewMediaDirectory = directory
+            previewMediaModified = modified
+            previewMediaGeneration = UUID()
+        }
+        if let url = previewMediaURLs[hash] { return url }
+        guard !previewMediaCompleted.contains(hash), previewMediaRequests[hash] == nil else { return nil }
+        let generation = previewMediaGeneration
+        let lookup = previewMediaLookup
+        previewMediaRequests[hash] = Task { [weak self] in
+            let url = await lookup.file(in: directory, hash: hash)
+            guard !Task.isCancelled, let self, self.previewMediaGeneration == generation else { return }
+            self.previewMediaRequests[hash] = nil
+            self.previewMediaCompleted.insert(hash)
+            self.previewMediaURLs[hash] = url
+            if url != nil, !self.previewRefreshScheduled {
+                self.previewRefreshScheduled = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.previewRefreshScheduled = false
+                    self?.objectWillChange.send()
+                }
+            }
+        }
+        return nil
     }
 
     /// 把一处图片引用解析成本机可显示的 URL。
@@ -1019,20 +1058,9 @@ final class OpsWorkspace: ObservableObject {
             return fileManager.fileExists(atPath: url.path) ? url : nil
         }
         if let hash = ShopCatalogSyncProtocol.mediaContentHash(in: reference) {
-            return OpsCachedMedia.files(in: stagingDirectory, hash: hash)[hash]
+            return cachedMediaLookup.file(in: stagingDirectory, hash: hash)
         }
         return nil
-    }
-
-    /// 商品的图片引用 → 本机可显示的 URL（顺序与 `product.images` 一致，解不出的跳过）
-    func stagedImageURLs(forProduct productID: String) -> [URL] {
-        guard let product = catalog.products.first(where: { $0.id == productID }) else { return [] }
-        return product.images.compactMap { assetID in
-            guard let asset = asset(for: assetID) else { return nil }
-            return stagedFileURL(forReference: asset.originalURL)
-                ?? stagedFileURL(forReference: asset.previewURL)
-                ?? stagedFileURL(forReference: asset.thumbnailURL)
-        }
     }
 
     /// 任何一次内容变更的唯一入口（R01）：
@@ -1353,31 +1381,7 @@ final class OpsWorkspace: ObservableObject {
         return record
     }
 
-    /// 把损坏草稿的原始字节写到用户选定的位置（保留证据用）
-    func exportCorruptedBackup(to url: URL) -> Bool {
-        guard let corrupt = draft else { return false }
-        let data = corrupt.corruptedBackupJSON ?? corrupt.catalogJSON
-        do {
-            try data.write(to: url, options: .atomic)
-            statusMessage = "已导出损坏草稿的原始字节：\(url.lastPathComponent)"
-            lastError = nil
-            return true
-        } catch {
-            lastError = "导出原始字节失败：\(error.localizedDescription)"
-            return false
-        }
-    }
-
-    // MARK: 发布基线（R07 的留痕位；读取要等 M3 接入受控发布器）
-
-    /// 记录这份草稿基于哪个线上版本。**只能由受控发布器回填** ——
-    /// Mac 端读不到线上基线，在 M3 接入之前不要据此声称「基线已核对」。
-    func recordBaseRelease(seq: Int?, rootIndexHash: String?) {
-        guard let draft else { return }
-        draft.baseReleaseSeq = seq
-        draft.baseRootIndexHash = rootIndexHash
-        try? context.save()
-    }
+    // MARK: 发布基线兼容读取
 
     var baseReleaseSeq: Int? { draft?.baseReleaseSeq }
     var baseRootIndexHash: String? { draft?.baseRootIndexHash }

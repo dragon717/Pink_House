@@ -63,14 +63,6 @@ extension OpsWorkspace {
         lastError = nil
         return true
     }
-
-    /// 这个实体是否已经存在于上次发布的基线快照里（= 线上有它）。
-    func isPublishedEntity(_ id: String) -> Bool {
-        guard let baseline = baselineCatalog else { return false }
-        return baseline.products.contains { $0.id == id }
-            || baseline.series.contains { $0.id == id }
-            || baseline.shops.contains { $0.id == id }
-    }
 }
 
 // MARK: - 规格（SKU：配色 + 尺码）
@@ -591,53 +583,6 @@ extension OpsWorkspace {
         statusMessage = "已复制为「\(copy.name)」（含 "
             + "\(catalog.variants.filter { $0.productID == newID }.count) 个规格、"
             + "\(catalog.sizeCharts.filter { $0.productID == newID }.count) 张尺码表；未保存）"
-        return true
-    }
-}
-
-// MARK: - 素材引用检查
-
-extension OpsWorkspace {
-
-    /// 谁在引用这个图片资源。**用共享的字段清单**（`ShopCatalogMediaReferences`），
-    /// 不自己列字段名 —— 自己列就会漏，而漏掉的那处会在删图之后变成悬空引用。
-    func references(toAsset assetID: String) -> [ShopCatalogMediaReference] {
-        guard let asset = catalog.assets.first(where: { $0.id == assetID }) else { return [] }
-        let urls = [asset.originalURL, asset.thumbnailURL, asset.previewURL].compactMap { $0 }
-        return ShopCatalogMediaReferences.all(in: catalog).filter { reference in
-            // asset-id 字段里存的就是资源 id 本身
-            if reference.allowsAssetID, reference.reference == assetID { return true }
-            // URL 字段里存的是同一个文件名（内容寻址 → 同一张图同一串字节）
-            if urls.contains(reference.reference) { return true }
-            return false
-        }
-    }
-
-    /// 从草稿里移除一个图片资源。**被引用时拒绝**并列出引用者。
-    ///
-    /// 为什么不做「连带解绑」：一次操作同时改掉商品、规格、系列、尺码表四个地方的
-    /// 引用，是「部分成功/静默扩大影响」的典型。运营需要看到「谁在用这张图」，
-    /// 自己决定先解绑哪一处。
-    @discardableResult
-    func removeAsset(id: String) -> Bool {
-        guard canMutate() else { return false }
-        guard catalog.assets.contains(where: { $0.id == id }) else {
-            lastError = "找不到图片资源 \(id)。"
-            return false
-        }
-        let users = references(toAsset: id)
-        if !users.isEmpty {
-            let owners = users.prefix(5).map { "\($0.owner)（\($0.field)）" }
-            lastError = "这张图还被 \(users.count) 处引用，不能移除："
-                + owners.joined(separator: "、")
-                + (users.count > 5 ? " 等" : "")
-                + "。请先在这些位置解绑，或者改为「归档」它所属的商品。"
-            return false
-        }
-        catalog.assets.removeAll { $0.id == id }
-        markDirty()
-        statusMessage = "已移除图片资源（未保存）。注意：staging 里的文件没有删，"
-            + "要释放磁盘请手动删除 staging 目录里的对应文件。"
         return true
     }
 }

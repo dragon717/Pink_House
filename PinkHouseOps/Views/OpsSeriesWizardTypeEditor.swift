@@ -121,37 +121,27 @@ struct OpsSeriesWizardTypeEntriesView: View {
 
     // MARK: 派生
 
-    private var issues: [OpsSeriesEntryIssue] {
-        OpsSeriesEntryValidator.validate(draft, catalog: workspace.catalog)
-            .filter { $0.area == .typeEntries }
-    }
-
-    private func issues(forEntry entryID: String) -> [OpsSeriesEntryIssue] {
-        issues.filter { $0.entryID == entryID }
-    }
-
     private var selectedEntry: OpsSeriesTypeEntry? {
         draft.typeEntries.first { $0.id == selectedEntryID }
     }
 
     var body: some View {
-        HSplitView {
-            entryListColumn
-                // 响应式硬约束：窗口最小 980 − 导航侧栏最大 260 → 详情区最窄 ~720。
-                // 两列 minWidth 之和**不得超过** 720，否则 NavigationSplitView 布局被撑爆
-                // （侧栏被顶出窗口、内容两侧裁切、底部「上一步/下一步」被挤出可视区），
-                // 且每次「上一步/下一步」重建 S3 时按 ideal 宽度重排，必然复现。
-                // 因此：左列 200 + 编辑器 460 = 660 ≤ 720；编辑器用 maxWidth: .infinity 吃掉余量。
-                .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
-            if let entry = selectedEntry, !collapsedCategories.contains(Self.categoryKey(entry)) {
-                OpsSeriesWizardTypeEditorView(workspace: workspace, entry: selectedBindingFor(entry))
-                    // 每个条目拥有自己的编辑器状态；切到副本不会触发旧编辑器的
-                    // 颜色数量/身份变化回调，把复制保留的尺码勾选重新补满。
-                    .id(entry.id)
-                    .frame(minWidth: 460, idealWidth: 480, maxWidth: .infinity)
-            } else {
-                emptyEditor
-                    .frame(minWidth: 360, idealWidth: 420, maxWidth: .infinity)
+        GeometryReader { geometry in
+            let listWidth = min(280, max(200, geometry.size.width * 0.3))
+            HStack(spacing: 0) {
+                entryListColumn
+                    .frame(width: listWidth, height: geometry.size.height)
+                Divider()
+                if let entry = selectedEntry, !collapsedCategories.contains(Self.categoryKey(entry)) {
+                    OpsSeriesWizardTypeEditorView(workspace: workspace, entry: selectedBindingFor(entry))
+                        // 每个条目拥有自己的编辑器状态；切到副本不会触发旧编辑器的
+                        // 颜色数量/身份变化回调，把复制保留的尺码勾选重新补满。
+                        .id(entry.id)
+                        .frame(width: max(0, geometry.size.width - listWidth - 1), height: geometry.size.height)
+                } else {
+                    emptyEditor
+                        .frame(width: max(0, geometry.size.width - listWidth - 1), height: geometry.size.height)
+                }
             }
         }
         .onAppear { clampSelection() }
@@ -217,73 +207,79 @@ struct OpsSeriesWizardTypeEntriesView: View {
     // MARK: 左列
 
     private var entryListColumn: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("本系列已选类型").font(.headline)
-                    .foregroundStyle(OpsFlowPalette.textPrimary)
-                Text("已选：\(draft.selectedCategorySummary)")
-                    .font(.caption)
-                    .foregroundStyle(OpsFlowPalette.textSecondary)
-                categoryPicker
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("本系列已选类型").font(.headline)
+                            .foregroundStyle(OpsFlowPalette.textPrimary)
+                        Text("已选：\(draft.selectedCategorySummary)")
+                            .font(.caption)
+                            .foregroundStyle(OpsFlowPalette.textSecondary)
+                        categoryPicker
+                        Divider()
+                        Text("添加同类型另一款款式").font(.subheadline.weight(.semibold))
+                            .foregroundStyle(OpsFlowPalette.textPrimary)
+                        addSameCategoryRow
+                        Text("点击类型收起或展开；拖动同类款式排序；删除只作用于指定款式。")
+                            .font(.caption)
+                            .foregroundStyle(OpsFlowPalette.textSecondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                }
+                // 类型选项再多也保留至少半屏给款式列表，选项自身可以滚动。
+                .frame(height: min(320, geometry.size.height * 0.5))
+
                 Divider()
-                Text("添加同类型另一款款式").font(.subheadline.weight(.semibold))
-                    .foregroundStyle(OpsFlowPalette.textPrimary)
-                addSameCategoryRow
-                Text("点击类型收起或展开；拖动同类款式排序；删除只作用于指定款式。")
-                    .font(.caption)
-                    .foregroundStyle(OpsFlowPalette.textSecondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
 
-            Divider()
-
-            if draft.typeEntries.isEmpty {
-                Text("还没有类型。至少选择一个类型才能继续。")
-                    .font(.callout).foregroundStyle(OpsFlowPalette.textSecondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(14)
-            } else {
-                List(selection: $selectedEntryID) {
-                    ForEach(categoryGroups) { group in
-                        Section {
-                            if !collapsedCategories.contains(group.id) {
-                                ForEach(group.entries) { entry in
-                                    draggableEntryRow(entry)
+                if draft.typeEntries.isEmpty {
+                    Text("还没有类型。至少选择一个类型才能继续。")
+                        .font(.callout).foregroundStyle(OpsFlowPalette.textSecondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .padding(14)
+                } else {
+                    List(selection: $selectedEntryID) {
+                        ForEach(categoryGroups) { group in
+                            Section {
+                                if !collapsedCategories.contains(group.id) {
+                                    ForEach(group.entries) { entry in
+                                        draggableEntryRow(entry)
+                                    }
                                 }
-                            }
-                        } header: {
-                            Button {
-                                setExpanded(collapsedCategories.contains(group.id), category: group.id)
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: collapsedCategories.contains(group.id) ? "chevron.right" : "chevron.down")
-                                        .font(.caption.weight(.semibold)).frame(width: 12)
-                                    Text(group.id).font(.subheadline.weight(.semibold))
-                                    Spacer(minLength: 2)
-                                    Text("\(group.entries.count) 款").font(.caption)
+                            } header: {
+                                Button {
+                                    setExpanded(collapsedCategories.contains(group.id), category: group.id)
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: collapsedCategories.contains(group.id) ? "chevron.right" : "chevron.down")
+                                            .font(.caption.weight(.semibold)).frame(width: 12)
+                                        Text(group.id).font(.subheadline.weight(.semibold))
+                                        Spacer(minLength: 2)
+                                        Text("\(group.entries.count) 款").font(.caption)
+                                    }
+                                    .foregroundStyle(OpsFlowPalette.textPrimary)
+                                    .padding(.vertical, 7)
+                                    .contentShape(Rectangle())
                                 }
-                                .foregroundStyle(OpsFlowPalette.textPrimary)
-                                .padding(.vertical, 7)
-                                .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+                                .help(collapsedCategories.contains(group.id) ? "展开这个类型的款式" : "收起这个类型的款式，资料会保留")
+                                .accessibilityLabel("\(collapsedCategories.contains(group.id) ? "展开" : "收起")\(group.id)，\(group.entries.count)款")
+                                .accessibilityIdentifier("ops.typeGroup.\(group.id)")
                             }
-                            .buttonStyle(.plain)
-                            .help(collapsedCategories.contains(group.id) ? "展开这个类型的款式" : "收起这个类型的款式，资料会保留")
-                            .accessibilityLabel("\(collapsedCategories.contains(group.id) ? "展开" : "收起")\(group.id)，\(group.entries.count)款")
-                            .accessibilityIdentifier("ops.typeGroup.\(group.id)")
                         }
                     }
+                    .listStyle(.inset)
+                    .scrollContentBackground(.hidden)
                 }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
             }
+            .background(OpsFlowPalette.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(OpsFlowPalette.cardBorder, lineWidth: 1))
+            .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
         }
-        .background(OpsFlowPalette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(OpsFlowPalette.cardBorder, lineWidth: 1))
-        .shadow(color: OpsFlowPalette.cardShadow, radius: 10, x: 0, y: 4)
         .padding(12)
         .frame(maxHeight: .infinity)
     }
@@ -391,7 +387,7 @@ struct OpsSeriesWizardTypeEntriesView: View {
     }
 
     private func entryRow(_ entry: OpsSeriesTypeEntry) -> some View {
-        let entryIssues = issues(forEntry: entry.id)
+        let entryIssues = workspace.entryValidationCache.issues(for: entry)
         return OpsFlowTile(color: entry.id == selectedEntryID
             ? OpsFlowPalette.tilePink : OpsFlowPalette.tileLilac.opacity(0.55),
             selected: entry.id == selectedEntryID) {
@@ -575,9 +571,7 @@ struct OpsSeriesWizardTypeEditorView: View {
     }
 
     private var entryIssues: [OpsSeriesEntryIssue] {
-        var issues: [OpsSeriesEntryIssue] = []
-        OpsSeriesEntryValidator.validateEntry(entry, into: &issues)
-        return issues
+        workspace.entryValidationCache.issues(for: entry)
     }
 
     var body: some View {
@@ -736,7 +730,7 @@ struct OpsSeriesWizardTypeEditorView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 OpsImageUploadThumbnail(
-                    url: workspace.stagedImageURL(forReference: entry.chartSourceImageAssetID),
+                    url: workspace.previewImageURL(forReference: entry.chartSourceImageAssetID),
                     size: 40, title: "点击上传或更换尺码表原图") {
                         guard let draftID = workspace.draft?.id else { return }
                         sizeChartImportError = nil
@@ -905,7 +899,7 @@ struct OpsSeriesWizardTypeEditorView: View {
             HStack(spacing: 8) {
                 OpsImageUploadThumbnail(
                     url: color.wrappedValue.imageAssetID.flatMap {
-                        workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
+                        workspace.previewFileURL(forReference: workspace.asset(for: $0)?.originalURL)
                     }, size: 36, title: "点击打开颜色批量配图", actionTitle: "重新配图") {
                         batchImageTarget = BatchImageTarget(id: entry.id, colorID: color.wrappedValue.id)
                     }
@@ -1033,7 +1027,7 @@ struct OpsSeriesWizardTypeEditorView: View {
     }
 
     private func assetFileLabel(_ asset: CatalogAsset) -> String {
-        workspace.stagedFileURL(forReference: asset.originalURL)?.lastPathComponent
+        workspace.previewFileURL(forReference: asset.originalURL)?.lastPathComponent
             ?? asset.originalURL.replacingOccurrences(of: "local:", with: "")
     }
 }

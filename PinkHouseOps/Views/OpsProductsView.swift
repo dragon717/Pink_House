@@ -57,9 +57,15 @@ struct OpsProductsView: View {
     }
 
     var body: some View {
-        HSplitView {
-            listColumn
-            detailColumn
+        GeometryReader { geometry in
+            let listWidth = min(320, max(240, geometry.size.width * 0.32))
+            HStack(spacing: 0) {
+                listColumn
+                    .frame(width: listWidth, height: geometry.size.height).clipped()
+                Divider()
+                detailColumn
+                    .frame(width: max(0, geometry.size.width - listWidth - 1), height: geometry.size.height).clipped()
+            }
         }
         .sheet(item: $sheet) { item in
             switch item {
@@ -326,7 +332,7 @@ struct OpsProductsView: View {
                         HStack(spacing: 8) {
                             ForEach(Array(product.images.enumerated()), id: \.offset) { index, assetID in
                                 VStack(spacing: 3) {
-                                    OpsPreviewableThumbnail(url: workspace.stagedFileURL(
+                                    OpsPreviewableThumbnail(url: workspace.previewFileURL(
                                         forReference: workspace.asset(for: assetID)?.originalURL),
                                                  size: 72)
                                     Text(index == 0 ? "首图" : "\(index + 1)")
@@ -445,7 +451,7 @@ struct OpsProductsView: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    OpsThumbnail(url: workspace.stagedFileURL(
+                    OpsThumbnail(url: workspace.previewFileURL(
                         forReference: CatalogVariantColorGrouping.leadingImage(
                             group.items, image: { $0.imageAssetID })
                             .flatMap { workspace.asset(for: $0)?.originalURL }),
@@ -509,7 +515,7 @@ struct OpsProductsView: View {
     private func variantRow(_ variant: CatalogProductVariant,
                             product: CatalogProduct) -> some View {
         HStack(spacing: 8) {
-            OpsThumbnail(url: workspace.stagedFileURL(
+            OpsThumbnail(url: workspace.previewFileURL(
                 forReference: variant.imageAssetID.flatMap {
                     workspace.asset(for: $0)?.originalURL
                 }),
@@ -555,7 +561,7 @@ struct OpsProductsView: View {
                     }
                     if let source = chart.sourceImage {
                         HStack(spacing: 8) {
-                            OpsThumbnail(url: workspace.stagedFileURL(
+                            OpsThumbnail(url: workspace.previewFileURL(
                                 forReference: workspace.asset(for: source)?.originalURL), size: 48)
                             OpsFootnote(text: "尺码表原图（结构化数据与原图缺一不可）")
                         }
@@ -1064,9 +1070,9 @@ private struct ProductImagesSheet: View {
 
     private func thumbURL(_ assetID: String) -> URL? {
         guard let asset = workspace.asset(for: assetID) else { return nil }
-        return workspace.stagedFileURL(forReference: asset.originalURL)
-            ?? workspace.stagedFileURL(forReference: asset.previewURL)
-            ?? workspace.stagedFileURL(forReference: asset.thumbnailURL)
+        return workspace.previewFileURL(forReference: asset.originalURL)
+            ?? workspace.previewFileURL(forReference: asset.previewURL)
+            ?? workspace.previewFileURL(forReference: asset.thumbnailURL)
     }
 
     private func assetLabel(_ assetID: String) -> String {
@@ -1129,7 +1135,7 @@ private struct VariantFormSheet: View {
     }
 
     private func assetLabel(_ asset: CatalogAsset) -> String {
-        workspace.stagedFileURL(forReference: asset.originalURL)?.lastPathComponent
+        workspace.previewFileURL(forReference: asset.originalURL)?.lastPathComponent
             ?? asset.originalURL.replacingOccurrences(of: "local:", with: "")
     }
 }
@@ -1146,7 +1152,7 @@ struct SizeChartFormSheet: View {
     var syncOnSave = false
     @Environment(\.dismiss) private var dismiss
 
-    @State private var unit = ""
+    @State private var unit = CatalogChartKind.size.defaultUnit
     @State private var columnsText = ""
     @State private var sourceAssetID = ""
     /// 每行一条：`标签 = 值1, 值2, …`
@@ -1181,7 +1187,7 @@ struct SizeChartFormSheet: View {
                         Text(assetLabel(asset)).tag(asset.id)
                     }
                 }
-                OpsImageUploadThumbnail(url: workspace.stagedFileURL(forReference:
+                OpsImageUploadThumbnail(url: workspace.previewFileURL(forReference:
                     workspace.asset(for: sourceAssetID)?.originalURL ?? sourceAssetID),
                     size: 72, title: "上传或替换尺码表原图") { importsSource = true }
                 Text(sourceAssetID.isEmpty ? "点击图片框上传尺码表原图" : "点击图片查看大图")
@@ -1217,7 +1223,7 @@ struct SizeChartFormSheet: View {
 
     private func load() {
         guard let chart = workspace.sizeChart(forProduct: productID) else { return }
-        unit = chart.unit ?? ""
+        unit = CatalogChartKind.size.unitForEditing(chart.unit)
         columnsText = chart.columns.joined(separator: ", ")
         sourceAssetID = chart.sourceImage ?? ""
         rowsText = chart.rows
@@ -1282,7 +1288,7 @@ struct SizeChartFormSheet: View {
     }
 
     private func assetLabel(_ asset: CatalogAsset) -> String {
-        workspace.stagedFileURL(forReference: asset.originalURL)?.lastPathComponent
+        workspace.previewFileURL(forReference: asset.originalURL)?.lastPathComponent
             ?? asset.originalURL.replacingOccurrences(of: "local:", with: "")
     }
 }

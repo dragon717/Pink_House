@@ -18,11 +18,8 @@
 //  预约价 / 现货价 / 差价的口径（含跨币种不比较、缺失一律「暂无」）只有一处定义，
 //  预览自己再推一遍就会变成第二个口径。
 //
-//  ## 缩略图是同步加载的
-//
-//  `NSImage(contentsOf:)` 在主线程上跑。这里图数量是运营手选的几十张量级、
-//  且只读本机文件，可以接受；真要放到上千张再谈异步，现在引入缓存层
-//  只会增加出错面。
+//  缩略图与运营其他页面共用 OpsImageLoader：后台降采样、限制缓存内存，
+//  不在 body 中同步读取或解码原图。
 //
 
 import SwiftUI
@@ -214,7 +211,7 @@ struct OpsPreviewView: View {
         HStack(spacing: 4) {
             ForEach(assets.prefix(3)) { asset in
                 ReferenceThumbnail(
-                    url: workspace.stagedFileURL(forReference: asset.originalURL),
+                    url: workspace.previewFileURL(forReference: asset.originalURL),
                     reference: asset.originalURL)
             }
             if assets.isEmpty {
@@ -296,10 +293,8 @@ private struct ReferenceThumbnail: View {
 
     var body: some View {
         Group {
-            if let url, let image = NSImage(contentsOf: url) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+            if let url {
+                OpsAsyncImage(url: url, pixels: 128)
             } else {
                 ZStack {
                     Color.secondary.opacity(0.10)

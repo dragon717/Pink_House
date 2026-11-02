@@ -67,7 +67,8 @@ struct OpsColorImagesSheet: View {
         }
         .padding(20)
         .background(Color(nsColor: .windowBackgroundColor))
-        .frame(width: 960, height: 650)
+        .frame(minWidth: 760, idealWidth: 960, maxWidth: 960,
+               minHeight: 440, idealHeight: 650, maxHeight: 650)
         .interactiveDismissDisabled(isImporting)
         .onAppear { workspace.loadImageUploadHistory() }
         .fileImporter(isPresented: $showsImporter, allowedContentTypes: [.image], allowsMultipleSelection: true) {
@@ -225,7 +226,7 @@ struct OpsColorImagesSheet: View {
             }
             .buttonStyle(.plain)
             OpsPreviewableThumbnail(url: assetID.flatMap {
-                workspace.stagedImageURL(forReference: $0)
+                workspace.previewImageURL(forReference: $0)
             }, size: 44)
             Button {
                 assignments.removeValue(forKey: color.id)

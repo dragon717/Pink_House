@@ -55,6 +55,26 @@ final class OpsSeriesPriceChartDraftTests: XCTestCase {
 
     // MARK: - ① 标准模板一次通过（模板常量来自共享包，UI 按钮读同一份）
 
+    func testNewDraftsHaveDefaultChartUnits() {
+        XCTAssertEqual(OpsSeriesEntryDraft().priceChartUnit, "元")
+        XCTAssertEqual(OpsSeriesTypeEntry(category: "OP").chartUnit, "CM")
+    }
+
+    func testRestoredBlankUnitsUseDefaultsAndCustomUnitsSurvive() throws {
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        for (size, price) in [("", ""), ("inch", "日元")] {
+            var target = OpsSeriesEntryDraft(typeEntries: [OpsSeriesTypeEntry(category: "OP")])
+            target.priceChartUnit = price
+            target.typeEntries[0].chartUnit = size
+            let restored = try decoder.decode(OpsSeriesEntryDraft.self, from: encoder.encode(target))
+            XCTAssertEqual(restored.priceChartUnit, price.isEmpty ? "元" : price)
+            XCTAssertEqual(restored.typeEntries[0].chartUnit, size.isEmpty ? "CM" : size)
+        }
+        let legacy = try decoder.decode(OpsSeriesTypeEntry.self, from: Data("{\"category\":\"OP\"}".utf8))
+        XCTAssertEqual(legacy.chartUnit, "CM")
+    }
+
     func testStandardTemplateProducesNoIssueAndIsRecognized() throws {
         let target = draft()
         XCTAssertEqual(OpsSeriesPriceChartValidation.issues(for: target), [])
@@ -144,7 +164,7 @@ final class OpsSeriesPriceChartDraftTests: XCTestCase {
         let legacy = try JSONSerialization.data(withJSONObject: object)
         let decoded = try decoder.decode(OpsSeriesEntryDraft.self, from: legacy)
         XCTAssertFalse(decoded.declaresPriceChart, "默认必须是「不动价格表」")
-        XCTAssertEqual(decoded.priceChartUnit, "")
+        XCTAssertEqual(decoded.priceChartUnit, "元")
         XCTAssertEqual(decoded.priceChartColumnsText, "")
         XCTAssertEqual(decoded.priceChartRowsText, "")
         XCTAssertEqual(decoded.priceChartImageAssetIDs, [])

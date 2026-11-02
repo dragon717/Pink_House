@@ -109,9 +109,14 @@ struct OpsSeriesWizardView: View {
             stepHeader
             Divider()
                 .overlay(OpsFlowPalette.cardBorder)
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // 隔离内容的固有最小尺寸，长表单不能向外撑走底部导航。
+            GeometryReader { geometry in
+                content
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+            .clipped()
             footer
+                .fixedSize(horizontal: false, vertical: true)
         }
         .background(OpsFlowPageBackground())
         .onChange(of: workspace.seriesEntryResetID) { _, _ in
@@ -269,14 +274,14 @@ struct OpsSeriesWizardView: View {
         guard let series = workspace.catalog.series.first(where: { $0.id == draft.seriesID }),
               let chart = series.priceChart else {
             workspace.seriesEntry.declaresPriceChart = false
-            workspace.seriesEntry.priceChartUnit = ""
+            workspace.seriesEntry.priceChartUnit = CatalogChartKind.price.defaultUnit
             workspace.seriesEntry.priceChartColumnsText = ""
             workspace.seriesEntry.priceChartRowsText = ""
             workspace.seriesEntry.priceChartImageAssetIDs = []
             return
         }
         workspace.seriesEntry.declaresPriceChart = true
-        workspace.seriesEntry.priceChartUnit = chart.unit ?? ""
+        workspace.seriesEntry.priceChartUnit = CatalogChartKind.price.unitForEditing(chart.unit)
         workspace.seriesEntry.priceChartColumnsText = chart.columns.joined(separator: ", ")
         workspace.seriesEntry.priceChartRowsText = chart.rows
             .map { $0.label + " = " + $0.values.map { $0 ?? "" }.joined(separator: ", ") }
@@ -361,7 +366,7 @@ struct OpsSeriesWizardView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 10) {
                             OpsImageUploadThumbnail(
-                                url: workspace.stagedImageURL(forReference: draft.coverAssetID), size: 64, title: "点击上传或更换系列封面") {
+                                url: workspace.previewImageURL(forReference: draft.coverAssetID), size: 64, title: "点击上传或更换系列封面") {
                                     showsCoverImporter = true
                                 }
                             Picker("封面", selection: bind(\.coverAssetID)) {
@@ -607,7 +612,7 @@ struct OpsSeriesWizardView: View {
         VStack(spacing: 3) {
             ZStack(alignment: .topTrailing) {
                 OpsImageUploadThumbnail(
-                    url: workspace.stagedFileURL(
+                    url: workspace.previewFileURL(
                         forReference: workspace.asset(for: assetID)?.originalURL),
                     size: 64, title: "点击添加价格表原图（可多选）", actionTitle: "添加图片") {
                         priceChartUploadError = nil
@@ -695,7 +700,7 @@ struct OpsSeriesWizardView: View {
     }
 
     private func assetFileLabel(_ asset: CatalogAsset) -> String {
-        workspace.stagedFileURL(forReference: asset.originalURL)?.lastPathComponent
+        workspace.previewFileURL(forReference: asset.originalURL)?.lastPathComponent
             ?? asset.originalURL.replacingOccurrences(of: "local:", with: "")
     }
 
@@ -722,11 +727,15 @@ struct OpsSeriesWizardView: View {
                     }
                 }
                 .buttonStyle(OpsFlowSecondaryButtonStyle(tint: .white, ghost: true))
+                .accessibilityIdentifier("ops.wizard.previous")
+                .opsLayoutProbe("ops.wizard.previous")
             }
             if step != OpsSeriesWizardStep.allCases.last {
                 Button("下一步") { goNext() }
+                    .accessibilityIdentifier("ops.wizard.next")
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(OpsFlowPrimaryButtonStyle(tint: OpsFlowPalette.primaryPurple))
+                    .opsLayoutProbe("ops.wizard.next")
             }
         }
     }
@@ -955,7 +964,7 @@ struct OpsSeriesWizardReviewView: View {
                 ForEach(entry.colors) { color in
                     HStack(spacing: 8) {
                         OpsPreviewableThumbnail(url: color.imageAssetID.flatMap {
-                            workspace.stagedFileURL(forReference: workspace.asset(for: $0)?.originalURL)
+                            workspace.previewFileURL(forReference: workspace.asset(for: $0)?.originalURL)
                         }, size: 28)
                         Text(color.name.isEmpty ? "（未命名颜色）" : color.name)
                         Text("可售尺码：" + (color.selectedSizes.isEmpty ? "（未勾选）"

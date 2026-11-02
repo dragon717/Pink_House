@@ -148,7 +148,7 @@ struct OpsSeriesTypeEntry: Codable, Equatable, Identifiable {
         category: String,
         designName: String = "",
         usesSizeChart: Bool = true,
-        chartUnit: String = "",
+        chartUnit: String = CatalogChartKind.size.defaultUnit,
         chartColumnsText: String = "",
         chartRowsText: String = "",
         chartSourceImageAssetID: String? = nil,
@@ -165,7 +165,7 @@ struct OpsSeriesTypeEntry: Codable, Equatable, Identifiable {
         self.category = category
         self.designName = designName
         self.usesSizeChart = usesSizeChart
-        self.chartUnit = chartUnit
+        self.chartUnit = CatalogChartKind.size.unitForEditing(chartUnit)
         self.chartColumnsText = chartColumnsText
         self.chartRowsText = chartRowsText
         self.chartSourceImageAssetID = chartSourceImageAssetID
@@ -342,7 +342,7 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         balanceEndAt: Date = Date(),
         reservationBatches: [CatalogReservationBatch]? = nil,
         declaresPriceChart: Bool = false,
-        priceChartUnit: String = "",
+        priceChartUnit: String = CatalogChartKind.price.defaultUnit,
         priceChartColumnsText: String = "",
         priceChartRowsText: String = "",
         priceChartImageAssetIDs: [String] = [],
@@ -370,7 +370,7 @@ struct OpsSeriesEntryDraft: Codable, Equatable {
         self.balanceEndAt = balanceEndAt
         self.reservationBatches = reservationBatches
         self.declaresPriceChart = declaresPriceChart
-        self.priceChartUnit = priceChartUnit
+        self.priceChartUnit = CatalogChartKind.price.unitForEditing(priceChartUnit)
         self.priceChartColumnsText = priceChartColumnsText
         self.priceChartRowsText = priceChartRowsText
         self.priceChartImageAssetIDs = priceChartImageAssetIDs

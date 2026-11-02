@@ -70,7 +70,7 @@ extension OpsWorkspace {
             let historyIDs = Set(items.map(\.id))
             items += catalog.assets.filter { !historyIDs.contains($0.id) }.map {
                 OpsImageLibraryItem(asset: $0, name: ($0.originalURL as NSString).lastPathComponent,
-                    fileURL: stagedFileURL(forReference: $0.originalURL), uploadedAt: .distantPast)
+                    fileURL: previewFileURL(forReference: $0.originalURL), uploadedAt: .distantPast)
             }
         }
         return items.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }

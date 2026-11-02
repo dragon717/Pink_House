@@ -162,7 +162,7 @@ struct SeriesConfigSheet: View {
     @State private var coverMessage: String?
 
     // 价格表
-    @State private var chartUnit = ""
+    @State private var chartUnit = CatalogChartKind.price.defaultUnit
     @State private var chartColumnsText = ""
     @State private var chartRowsText = ""
     @State private var chartSourceImage = ""
@@ -343,7 +343,7 @@ struct SeriesConfigSheet: View {
             Text("系列封面").font(.subheadline.weight(.semibold))
             HStack(spacing: 10) {
                 OpsPreviewableThumbnail(
-                    url: workspace.stagedImageURL(forReference: coverAssetID), size: 48)
+                    url: workspace.previewImageURL(forReference: coverAssetID), size: 48)
                 Picker("封面", selection: $coverAssetID) {
                     Text("不指定").tag(String?.none)
                     ForEach(workspace.catalog.assets) { asset in
@@ -438,7 +438,7 @@ struct SeriesConfigSheet: View {
                           workspace.saveCatalogEditorChanges(seriesID: seriesID, fields: [.priceChart]) else {
                         chartError = workspace.statusText; return
                     }
-                    chartUnit = ""
+                    chartUnit = CatalogChartKind.price.defaultUnit
                     chartColumnsText = ""
                     chartRowsText = ""
                     chartSourceImage = ""
@@ -518,7 +518,7 @@ struct SeriesConfigSheet: View {
     }
 
     private func assetLabel(_ asset: CatalogAsset) -> String {
-        workspace.stagedFileURL(forReference: asset.originalURL)?.lastPathComponent
+        workspace.previewFileURL(forReference: asset.originalURL)?.lastPathComponent
             ?? asset.originalURL.replacingOccurrences(of: "local:", with: "")
     }
 
@@ -558,7 +558,7 @@ struct SeriesConfigSheet: View {
         }
 
         if let chart = series.priceChart {
-            chartUnit = chart.unit ?? ""
+            chartUnit = CatalogChartKind.price.unitForEditing(chart.unit)
             chartColumnsText = chart.columns.joined(separator: ", ")
             chartRowsText = chart.rows
                 .map { row in row.label + " = " + row.values.map { $0 ?? "" }.joined(separator: ", ") }

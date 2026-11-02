@@ -188,27 +188,6 @@ final class OpsCloudSyncModel: ObservableObject {
     /// 桥接器自检（空 = 就绪）。它会自己打开一次仓库授权。
     var diagnosis: [String] { settings.diagnosis() }
 
-    /// 当前环境的容器内凭证文件（存在才有值）。没有它，子进程在沙盒里读不到 Keychain。
-    ///
-    /// **按环境取**：CloudKit 的 s2s key 是按环境注册的，一份凭证不可能同时
-    /// 对 Development 与 Production 有效。
-    var credentialFileURL: URL? {
-        OpsPublisherBridge.existingCredentialFile(environmentName: targetEnvironment.rawValue)
-    }
-
-    /// 当前环境的凭证摘要（只含 containerID / keyID，私钥永不进这里）
-    var credentialSummary: OpsPublisherBridge.OpsCredentialSummary? {
-        OpsPublisherBridge.credentialSummary(environmentName: targetEnvironment.rawValue)
-    }
-
-    var credentialText: String {
-        guard let url = credentialFileURL else {
-            return "未配置（约定位置："
-                + "\(OpsPublisherBridge.credentialFileURL(environmentName: targetEnvironment.rawValue).path)）"
-        }
-        return "已配置：\(url.path)"
-    }
-
     /// 每个远端环境各自有没有凭证。**分环境展示**是刻意的：
     /// 只显示「有没有凭证」会让「Development 配好了、Production 没配」看起来像
     /// 「都配好了」，而那正是 401 最常出现的形态。
@@ -219,26 +198,6 @@ final class OpsCloudSyncModel: ObservableObject {
                 isConfigured: OpsPublisherBridge.existingCredentialFile(
                     environmentName: environment.rawValue) != nil)
         }
-    }
-
-    /// 当前环境缺凭证时的**分步指引**。
-    ///
-    /// 为什么不写一句「请配置凭证」就完事：Production 缺凭证的根因几乎总是
-    /// 「只注册过 Development 的 s2s key」，而它的处置是**去 Console 再注册一个**，
-    /// 不是「再把同一个文件选一次」——指引必须指向真正能解决问题的那个动作。
-    var credentialGuidance: String {
-        // 协议里只有 Development / Production 两个环境（本机演练已移除），
-        // 所以按「是否 Production」分流，不需要再为第三个环境留分支。
-        if targetEnvironment == .production {
-            return "需要一份 **Production** 凭证 JSON。s2s key 是**按环境注册**的，"
-                + "Development 那一份打 Production 只会 401，必须单独注册："
-                + "CloudKit Console → 顶部环境切 **Production** → API Access → Server-to-Server Keys → 新建 key；"
-                + "再确认 Schema 已从 Development **Deploy to Production**（否则记录类型根本不存在）。"
-                + "三个字段同上，`containerID` 仍是 `iCloud.bugod2.ItemManager`。"
-        }
-        return "需要一份 **Development** 凭证 JSON（`keyID` / `privateKey` / `containerID`）："
-            + "CloudKit Console → 环境切 Development → API Access → Server-to-Server Keys → "
-            + "取 Key ID 与私钥 PEM，`containerID` 填 `iCloud.bugod2.ItemManager`。"
     }
 
     // MARK: 环境作用域状态
@@ -344,36 +303,6 @@ final class OpsCloudSyncModel: ObservableObject {
             append("✓ 已写入 \(targetEnvironment.displayName) 凭证：\(target.lastPathComponent)")
         } catch {
             lastError = "凭证文件拷贝到 App 容器失败：\(error.localizedDescription)"
-        }
-    }
-
-    func readOnlineBaseline() async {
-        guard await ensureReady(.baseline) else { return }
-        onlineHead = nil
-        let directory = jobDirectory("baseline-\(Int(Date().timeIntervalSince1970))")
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        } catch {
-            lastError = "创建工作目录失败：\(error.localizedDescription)"
-            return
-        }
-        let request = makeRequest(
-            requestID: "baseline-\(UUID().uuidString)",
-            jobID: "baseline",
-            releaseSeq: max(1, (onlineHead?.releaseSeq ?? 0)),
-            archivePath: directory.appendingPathComponent("none.tar").path,
-            input: directory.appendingPathComponent("input"),
-            output: directory.appendingPathComponent("output"),
-            receipt: directory.appendingPathComponent("receipt.json"),
-            payloadHash: "baseline")
-        guard let requestURL = write(request, to: directory) else { return }
-
-        await perform(mode: .baseline, requestPath: requestURL) { [weak self] result in
-            guard let self else { return }
-            self.onlineHead = result.exitCode == 0 && result.outcome == .confirmed ? result.onlineHead : nil
-            self.outcome = result.outcome
-            self.outcomeMessage = result.outcomeMessage ?? result.lastDisplayLine
-            self.outcomeRetryable = result.outcomeRetryable
         }
     }
 
@@ -813,13 +742,6 @@ final class OpsCloudSyncModel: ObservableObject {
         appendOperationLog(line)
     }
 
-    func clearLog() {
-        logLines = []
-        runLog = []
-        // `logFileURL` 刻意不清：那是一个**已经写在磁盘上的产物**，
-        // 清空面板不等于删文件，把链接一起抹掉只会让人更找不到它。
-    }
-
     // MARK: 日志（复制 / 落盘）
 
     /// 可以直接粘进聊天、Issue 或邮件里的完整日志文本。
@@ -924,17 +846,6 @@ final class OpsCloudSyncModel: ObservableObject {
         let latest = directory.appendingPathComponent("latest.log")
         guard (try? data.write(to: latest, options: .atomic)) != nil else { return }
         logFileURL = latest
-    }
-
-    /// 在访达里打开日志文件夹（`bridge/logs/`，设置页入口）。
-    func revealLogsFolder() {
-        NSWorkspace.shared.open(logsDirectory)
-    }
-
-    /// 在访达里选中最近一次的日志文件。
-    func revealLogFile() {
-        guard let url = logFileURL else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     /// 记一次**没走到桥接器**的失败，并把它落盘。

@@ -13,7 +13,7 @@ struct OpsShopLogoPicker: View {
             Text("店家 Logo").font(.subheadline.weight(.semibold))
             HStack(spacing: 12) {
                 OpsImageUploadThumbnail(
-                    url: workspace.stagedFileURL(forReference:
+                    url: workspace.previewFileURL(forReference:
                         reference.flatMap { workspace.asset(for: $0)?.originalURL ?? $0 }),
                     size: 64, title: "点击上传或替换店家 Logo") { importsImage = true }
                 VStack(alignment: .leading, spacing: 4) {

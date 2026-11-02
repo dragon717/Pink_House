@@ -134,9 +134,8 @@ private struct OpsTableImage: View {
     let reference: String
 
     var body: some View {
-        if let url = workspace.stagedFileURL(forReference: workspace.asset(for: reference)?.originalURL ?? reference),
-           let image = NSImage(contentsOf: url) {
-            Image(nsImage: image).resizable().scaledToFit()
+        if let url = workspace.previewFileURL(forReference: workspace.asset(for: reference)?.originalURL ?? reference) {
+            OpsAsyncImage(url: url, pixels: 1200, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: 300)
                 .opsImagePreview(url: url)
         } else {
@@ -151,7 +150,7 @@ struct OpsSeriesPriceChartEditor: View {
     @ObservedObject var workspace: OpsWorkspace
     let seriesID: String
     @Environment(\.dismiss) private var dismiss
-    @State private var unit = ""
+    @State private var unit = CatalogChartKind.price.defaultUnit
     @State private var columns = ""
     @State private var rows = ""
     @State private var images: [String] = []
@@ -180,7 +179,7 @@ struct OpsSeriesPriceChartEditor: View {
         .onAppear {
             guard !didLoad else { return }; didLoad = true
             guard let chart = workspace.catalog.series.first(where: { $0.id == seriesID })?.priceChart else { return }
-            unit = chart.unit ?? ""
+            unit = CatalogChartKind.price.unitForEditing(chart.unit)
             columns = chart.columns.joined(separator: ",")
             rows = chart.rows.map { $0.label + " = " + $0.values.map { $0 ?? "" }.joined(separator: ",") }.joined(separator: "\n")
             images = chartImageReferences(chart)

@@ -145,7 +145,7 @@ final class CatalogChartTemplateTests: XCTestCase {
     /// 两张表的「单位」不是一回事：尺码表是长度，价格表是金额。
     /// （Mac 价格表卡片的 placeholder 曾写成「如 cm / inch」，就是从尺码表抄过来的。）
     func testTwoTemplatesUseDifferentUnits() {
-        XCTAssertEqual(CatalogChartTemplate.SizeChart.unit, "cm")
+        XCTAssertEqual(CatalogChartTemplate.SizeChart.unit, "CM")
         XCTAssertEqual(CatalogChartTemplate.PriceChart.unit, "元")
         XCTAssertNotEqual(CatalogChartTemplate.SizeChart.unit, CatalogChartTemplate.PriceChart.unit)
     }

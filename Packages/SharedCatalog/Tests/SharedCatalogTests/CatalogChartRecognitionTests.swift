@@ -41,6 +41,17 @@ final class CatalogChartRecognitionTests: XCTestCase {
         ("三丽鸥家族合作款 美乐蒂背带", ["439", "87", "352"]),
     ]
 
+    func testEditingUnitsDefaultOnlyWhenMissingOrBlank() {
+        for unit in [nil, "", " \n\t"] as [String?] {
+            XCTAssertEqual(CatalogChartKind.size.unitForEditing(unit), "CM")
+            XCTAssertEqual(CatalogChartKind.price.unitForEditing(unit), "元")
+        }
+        for unit in ["cm", "inch", "¥", "日元"] {
+            XCTAssertEqual(CatalogChartKind.size.unitForEditing(unit), unit)
+            XCTAssertEqual(CatalogChartKind.price.unitForEditing(unit), unit)
+        }
+    }
+
     // MARK: 成功：两种表各自的文案
 
     func testSizeChartSuccessHeadlineNamesTheSizeChart() {
@@ -71,6 +82,21 @@ final class CatalogChartRecognitionTests: XCTestCase {
         XCTAssertTrue(recognition.detail.contains("3 行"), recognition.detail)
         XCTAssertTrue(recognition.detail.contains("3 列"), recognition.detail)
         XCTAssertTrue(recognition.detail.contains("9/9 格有内容"), recognition.detail)
+    }
+
+    func testBNTAccessoryIsAcceptedByEveryRecognitionSource() {
+        for label in ["BNT", "bnt", "Bnt", " BNT "] {
+            XCTAssertFalse(CatalogChartQuality.isGarbageToken(label), label)
+            let accessoryRows = rows([(label, ["99", "20", "79"])])
+            for source in CatalogChartRecognition.Source.allCases {
+                let recognition = CatalogChartRecognition.verdict(
+                    kind: .price, source: source,
+                    columns: priceColumns, rows: accessoryRows)
+
+                XCTAssertTrue(recognition.isSuccess, "\(source) / \(label): \(recognition.detail)")
+                XCTAssertEqual(recognition.recognizedRows, accessoryRows)
+            }
+        }
     }
 
     func testSuccessHasNoGuidanceAndExposesRecognizedContent() {
