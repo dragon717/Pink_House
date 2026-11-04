@@ -472,8 +472,10 @@ struct HomeView: View {
     @State private var depositStatusFilter: DepositStatusFilter = .all
     @State private var depositSearchText = ""
     @State private var showingDepositNotificationSheet = false
-    @State private var notificationTargetClothing: Clothing?
-    @State private var navigateToNotificationDetail = false
+    @State private var selectedClothing: Clothing?
+    @State private var collectionWidth: CGFloat = 0
+    @State private var preferredCompactColumn: NavigationSplitViewColumn = .sidebar
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var hasLoadedDepositPlan = false
     @AppStorage("UserPreference_DepositDisplayMode") private var depositDisplayMode: DepositDisplayMode = .detail
     
@@ -580,6 +582,39 @@ struct HomeView: View {
     }
     
     var body: some View {
+        NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
+            collectionNavigation
+                .navigationSplitViewColumnWidth(min: 300, ideal: 400, max: 520)
+        } detail: {
+            NavigationStack {
+                if let clothing = selectedClothing, !clothing.isDeleted, clothing.deletedAt == nil {
+                    ClothingDetailView(clothing: clothing)
+                        .id(clothing.id)
+                } else {
+                    ContentUnavailableView("请选择一件裙装".appLocalized, systemImage: "tshirt")
+                }
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .onChange(of: preferredCompactColumn) { _, column in
+            if column == .sidebar && horizontalSizeClass == .compact {
+                selectedClothing = nil
+            }
+        }
+        .onChange(of: selectedClothing?.deletedAt) { _, date in
+            if date != nil {
+                selectedClothing = nil
+                preferredCompactColumn = .sidebar
+            }
+        }
+    }
+
+    private func showClothing(_ clothing: Clothing) {
+        selectedClothing = clothing
+        preferredCompactColumn = .detail
+    }
+
+    private var collectionNavigation: some View {
         NavigationStack {
             ZStack(alignment: .top) {
                 // Background
@@ -609,7 +644,8 @@ struct HomeView: View {
                         selectedAccessories: selectedAccessories,
                         depositStatusFilter: depositStatusFilter,
                         filterDescription: getFilterDescription(),
-                        onClearFilter: clearAllFilters
+                        onClearFilter: clearAllFilters,
+                        onSelectClothing: showClothing
                     )
                     // 为窄边入口留出独立区域，卡片及其点击范围不延伸到入口下方。
                     .safeAreaInset(edge: .trailing, spacing: 0) {
@@ -635,7 +671,8 @@ struct HomeView: View {
                             selectedSizes: selectedSizes,
                             selectedLengths: selectedLengths,
                             selectedConditions: selectedConditions,
-                            selectedAccessories: selectedAccessories
+                            selectedAccessories: selectedAccessories,
+                            onSelectClothing: showClothing
                         )
                         // Force recreation when sortOption changes to ensure proper sorting
                         .id("deposit_\(sortOption.id)")
@@ -650,12 +687,15 @@ struct HomeView: View {
                     transaction.disablesAnimations = true
                 }
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { collectionWidth = $0 }
             .onChange(of: viewLayout) { _, _ in
                 RewardManager.shared.triggerReward(type: .firstTimeFeature("ViewLayoutChange"))
             }
             .onChange(of: selectedTab) { _, _ in
                 // 切换标签页时关闭搜索栏
                 isSearchActive = false
+                selectedClothing = nil
+                preferredCompactColumn = .sidebar
                 if selectedTab == .depositPlan {
                     hasLoadedDepositPlan = true
                 }
@@ -676,6 +716,24 @@ struct HomeView: View {
                     ToolbarItem(placement: .principal) {
                         wardrobeTopSearchBar
                     }
+                } else if #available(iOS 27.1, *) {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Menu {
+                            Button("少女衣橱".appLocalized, systemImage: "tshirt") {
+                                setHomeTabWithoutContentAnimation(.wardrobe)
+                            }
+                            Button("心愿尾款".appLocalized, systemImage: "calendar") {
+                                setHomeTabWithoutContentAnimation(.depositPlan)
+                            }
+                        } label: {
+                            Label(selectedTab == .wardrobe ? "少女衣橱".appLocalized : "心愿尾款".appLocalized,
+                                  systemImage: selectedTab == .wardrobe ? "tshirt" : "calendar")
+                        }
+                    }
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        wardrobeActions
+                    }
+                    .axisBehavior(.verticalPreferred)
                 } else if effectiveWardrobeNavigationStyle == .classic {
                     ToolbarItem(placement: .topBarLeading) {
                         HomeThemeSkinToolbarShell(
@@ -759,11 +817,6 @@ struct HomeView: View {
                     DepositNotificationView()
                 }
             }
-            .navigationDestination(isPresented: $navigateToNotificationDetail) {
-                if let clothing = notificationTargetClothing {
-                    ClothingDetailView(clothing: clothing)
-                }
-            }
             .onReceive(tabNavigationManager.$navigateToClothingID) { clothingID in
                 guard let clothingID else { return }
                 openNotificationClothingDetail(clothingID)
@@ -811,13 +864,8 @@ struct HomeView: View {
             descriptor.fetchLimit = 1
 
             guard let clothing = (try? modelContext.fetch(descriptor))?.first else { return }
-            notificationTargetClothing = clothing
-            navigateToNotificationDetail = false
-
-            DispatchQueue.main.async {
-                navigateToNotificationDetail = true
-                tabNavigationManager.navigateToClothingID = nil
-            }
+            showClothing(clothing)
+            tabNavigationManager.navigateToClothingID = nil
         }
 
         if selectedTab != .depositPlan {
@@ -1002,7 +1050,7 @@ struct HomeView: View {
     }
 
     private var topBarContentWidth: CGFloat {
-        min(max(UIScreen.main.bounds.width - 32, 320), 620)
+        min(max(collectionWidth - 32, 0), 620)
     }
 
     private var activeSearchText: Binding<String> {
@@ -1132,42 +1180,47 @@ struct HomeView: View {
             showingAddSheet ||
             showingDepositNotificationSheet ||
             showingMultiDimensionalFilterSheet ||
-            navigateToNotificationDetail ||
+            (selectedClothing != nil) ||
             batchImportUnlockAlert != nil
     }
     
     private var classicActionButtons: some View {
         HStack(spacing: 6) {
-            // 完成编辑按钮（编辑模式时直接显示）
-            if selectedTab == .wardrobe && isSelectionMode {
-                doneEditButton
-            }
-            
-            // 完成排序按钮（自定义排序编辑模式时直接显示）
-            if selectedTab == .wardrobe && sortOption == .custom && isEditing {
-                doneSortButton
-            }
-            
-            // 排序、筛选、视图直接显示在导航栏（非编辑模式时显示）
-            if !isInWardrobeEditMode {
-                sortButton
-                filterButton
-                displayButton
-            }
-            
-            // 补款提醒（仅心愿尾款标签页，且非编辑模式）
-            if selectedTab == .depositPlan && !isInWardrobeEditMode {
-                notificationButton
-            }
-            
-            // 更多菜单 - 包含搜索、编辑、自定义排序等功能
-            moreMenuButton
-            
-            addButton
+            wardrobeActions
         }
         .fixedSize(horizontal: true, vertical: false)
     }
-    
+
+    @ViewBuilder
+    private var wardrobeActions: some View {
+        // 完成编辑按钮（编辑模式时直接显示）
+        if selectedTab == .wardrobe && isSelectionMode {
+            doneEditButton
+        }
+
+        // 完成排序按钮（自定义排序编辑模式时直接显示）
+        if selectedTab == .wardrobe && sortOption == .custom && isEditing {
+            doneSortButton
+        }
+
+        // 排序、筛选、视图直接显示在导航栏（非编辑模式时显示）
+        if !isInWardrobeEditMode {
+            sortButton
+            filterButton
+            displayButton
+        }
+
+        // 补款提醒（仅心愿尾款标签页，且非编辑模式）
+        if selectedTab == .depositPlan && !isInWardrobeEditMode {
+            notificationButton
+        }
+
+        // 更多菜单 - 包含搜索、编辑、自定义排序等功能
+        moreMenuButton
+
+        addButton
+    }
+
     private var fashionLeadingButtons: some View {
         HStack(spacing: 4) {
             if selectedTab == .wardrobe && isSelectionMode {

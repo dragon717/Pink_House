@@ -86,6 +86,7 @@ struct DepositPlanView: View {
     
     // Sort option - stored to apply sorting manually since @Query doesn't update dynamically
     let sortOption: SortOption
+    let onSelectClothing: (Clothing) -> Void
     
     init(searchText: Binding<String>, 
          displayMode: Binding<DepositDisplayMode>,
@@ -97,7 +98,8 @@ struct DepositPlanView: View {
          selectedSizes: Set<String>,
          selectedLengths: Set<String>,
          selectedConditions: Set<String>,
-         selectedAccessories: Set<String>) {
+         selectedAccessories: Set<String>,
+         onSelectClothing: @escaping (Clothing) -> Void) {
         _searchText = searchText
         _displayMode = displayMode
         // 统一使用 deletedAt == nil 作为未删除的判断条件，与衣橱列表保持一致
@@ -119,6 +121,7 @@ struct DepositPlanView: View {
         self.selectedConditions = selectedConditions
         self.selectedAccessories = selectedAccessories
         self.sortOption = sortOption
+        self.onSelectClothing = onSelectClothing
     }
     
     private var finalPaymentClothings: [Clothing] {
@@ -412,8 +415,8 @@ struct DepositPlanView: View {
                 // List
                 LazyVStack(spacing: 16) {
                     ForEach(filteredClothings) { clothing in
-                        NavigationLink {
-                            ClothingDetailView(clothing: clothing)
+                        Button {
+                            onSelectClothing(clothing)
                         } label: {
                             if displayMode == .simple {
                                 SimpleDepositItemRow(clothing: clothing)

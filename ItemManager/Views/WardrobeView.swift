@@ -583,8 +583,7 @@ struct WardrobeView: View {
     @State private var itemToCopy: Clothing?
     @State private var showingCopyAlert = false
     @State private var itemToEdit: Clothing?
-    @State private var detailNavigationTarget: Clothing?
-    @State private var isShowingDetailNavigation = false
+    let onSelectClothing: (Clothing) -> Void
     @State private var itemToMarkSold: Clothing?
     @State private var showingMarkSoldAlert = false
     @State private var itemToMarkFinalPaymentPaid: Clothing?
@@ -592,6 +591,7 @@ struct WardrobeView: View {
     
     // Auto-scroll
     @State private var visibleItemIDs: Set<UUID> = []
+    @State private var viewportSize: CGSize = .zero
     @State private var autoScrollTask: Task<Void, Never>?
     @State private var visibleItemFrameUpdateTask: Task<Void, Never>?
     @State private var layoutPrefetchTask: Task<Void, Never>?
@@ -649,7 +649,8 @@ struct WardrobeView: View {
          selectedAccessories: Set<String>,
          depositStatusFilter: DepositStatusFilter,
          filterDescription: String? = nil,
-         onClearFilter: (() -> Void)? = nil) {
+         onClearFilter: (() -> Void)? = nil,
+         onSelectClothing: @escaping (Clothing) -> Void) {
         _searchText = searchText
         _isSelectionMode = isSelectionMode
         _isEditing = isEditing
@@ -675,6 +676,7 @@ struct WardrobeView: View {
 
         self.filterDescription = filterDescription
         self.onClearFilter = onClearFilter
+        self.onSelectClothing = onSelectClothing
     }
     
     // Grid layout
@@ -756,7 +758,7 @@ struct WardrobeView: View {
         GeometryReader { proxy in
             Color.clear.preference(
                 key: WardrobeVisibleItemFramePreferenceKey.self,
-                value: [clothing.id: proxy.frame(in: .global)]
+                value: [clothing.id: proxy.frame(in: .named("wardrobeViewport"))]
             )
         }
     }
@@ -950,14 +952,9 @@ struct WardrobeView: View {
                 gridWardrobeView
             }
         }
-        .toolbar {
-        }
+        .coordinateSpace(name: "wardrobeViewport")
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { viewportSize = $0 }
         .containerAdaptiveColors(background: .ultraThinMaterial)
-        .navigationDestination(isPresented: $isShowingDetailNavigation) {
-            if let detailNavigationTarget {
-                ClothingDetailView(clothing: detailNavigationTarget)
-            }
-        }
         .sheet(item: $itemToEdit) { clothing in
             NavigationStack {
                 ClothingEditView(clothing: clothing)
@@ -1518,7 +1515,7 @@ struct WardrobeView: View {
             if isSelectionMode {
                 toggleSelection(clothing.id)
             } else if !isEditing {
-                openDetail(clothing)
+                onSelectClothing(clothing)
             }
         } label: {
             cell
@@ -1568,11 +1565,6 @@ struct WardrobeView: View {
         } else {
             selectedItemIDs.insert(id)
         }
-    }
-
-    private func openDetail(_ clothing: Clothing) {
-        detailNavigationTarget = clothing
-        isShowingDetailNavigation = true
     }
 
     private func clothing(with id: UUID) -> Clothing? {
@@ -2375,7 +2367,7 @@ struct WardrobeView: View {
 
     private func normalRow(for clothing: Clothing) -> some View {
         Button {
-            openDetail(clothing)
+            onSelectClothing(clothing)
         } label: {
             VStack(spacing: 0) {
                 clothingRowView(clothing: clothing)
@@ -2667,9 +2659,9 @@ struct WardrobeView: View {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled, isReorderTrackingEnabled else { return }
 
-            let expandedScreenBounds = UIScreen.main.bounds.insetBy(dx: -32, dy: -160)
+            let expandedViewportBounds = CGRect(origin: .zero, size: viewportSize).insetBy(dx: -32, dy: -160)
             let visibleIDs = frames.compactMap { id, frame in
-                expandedScreenBounds.intersects(frame) ? id : nil
+                expandedViewportBounds.intersects(frame) ? id : nil
             }
             visibleItemIDs = Set(visibleIDs)
         }

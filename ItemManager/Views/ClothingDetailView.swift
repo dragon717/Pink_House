@@ -151,41 +151,39 @@ struct ClothingDetailView: View {
         .navigationTitle("衣橱详情".appLocalized)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
-                    // 分享按钮
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                // 分享按钮
+                Button {
+                    showingShareSheet = true
+                } label: {
+                    Label("分享".appLocalized, systemImage: "square.and.arrow.up")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+
+                // 更多操作菜单
+                Menu {
                     Button {
-                        showingShareSheet = true
+                        showingEditSheet = true
                     } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.primary)
+                        Label("编辑".appLocalized, systemImage: "pencil")
                     }
-                    
-                    // 更多操作菜单
-                    Menu {
-                        Button {
-                            showingEditSheet = true
-                        } label: {
-                            Label("编辑".appLocalized, systemImage: "pencil")
-                        }
-                        
-                        Button {
-                            duplicateClothing()
-                        } label: {
-                            Label("复制".appLocalized, systemImage: "doc.on.doc")
-                        }
-                        
-                        Button(role: .destructive) {
-                            showingDeleteAlert = true
-                        } label: {
-                            Label("删除".appLocalized, systemImage: "trash")
-                        }
+
+                    Button {
+                        duplicateClothing()
                     } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.headline)
-                            .foregroundStyle(.primary)
+                        Label("复制".appLocalized, systemImage: "doc.on.doc")
                     }
+
+                    Button(role: .destructive) {
+                        showingDeleteAlert = true
+                    } label: {
+                        Label("删除".appLocalized, systemImage: "trash")
+                    }
+                } label: {
+                    Label("更多".appLocalized, systemImage: "ellipsis")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
                 }
             }
         }

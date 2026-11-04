@@ -23,6 +23,8 @@
 
 ## Xcode 27 beta / SDK 27
 
+- 2026-11-04 Duo 适配后，编译与归档使用 Xcode 27.1 或更新版本。本机路径为 `/Users/sangyu/Applications/Xcode-27.1.app`（27A9275），显式设置 `DEVELOPER_DIR`。导航采用系统竖条与 `NavigationSplitView`，验证见 `docs/IPHONE_DUO_ADAPTATION.md`。
+
 - 当前本机核验（2026-10-11）：`/Applications/Xcode.app` 为 Xcode 27.0 正式版 build `27A266a`，本期构建与官方技能导出使用 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`。下面 beta 条目仅为历史记录；先核验实际安装，再选择路径。
 
 - 使用 Xcode beta 时默认显式设置 `DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer`，不要为单次构建改全局 `xcode-select`。
