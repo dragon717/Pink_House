@@ -31,4 +31,4 @@ xcodebuild -scheme ItemManager \
 
 [展开双栏](../output/duo-adaptation/proof/open-detail.png) · [合上保留详情](../output/duo-adaptation/proof/closed-detail.png) · [外屏返回](../output/duo-adaptation/proof/closed-back.png) · [再次展开保留新选择](../output/duo-adaptation/proof/reopen-selection.png)
 
-本轮覆盖专用 Duo 模拟器上的上述流程。iPad、旧系统、真机、与另一 App 并排的系统多任务窗口及支付操作未在本轮重跑。App Store 商店图片仍是上一轮发布物料；本次交付为代码提交和运行证据。
+上述适配验收覆盖专用 Duo 模拟器。真机、与另一 App 并排的系统多任务窗口及支付操作未在本轮重跑。2026-11-07 已另行补拍 iPad 和 iPhone 商品图；最新素材范围、构建验证及 Safari 上传进度见 [商店截图更新记录](APP_STORE_SCREENSHOT_REFRESH_2026-11-07.md)，线上仍有待完成的替换与排序。
