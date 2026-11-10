@@ -112,6 +112,11 @@ class PetDataManager: ObservableObject {
     /// 操作奖励：余额与幂等标识先同快照写入本地，再发布到账通知。
     @MainActor
     func persistOperationReward(_ newStatus: PetStatus) -> Bool {
+        persistWalletStatus(newStatus, source: "operationReward")
+    }
+
+    @MainActor
+    func persistWalletStatus(_ newStatus: PetStatus, source: String?) -> Bool {
         let sanitized = Self.sanitizeStatus(newStatus)
         guard let encoded = try? JSONEncoder().encode(sanitized) else { return false }
         let modifiedAt = Date()
@@ -127,7 +132,7 @@ class PetDataManager: ObservableObject {
             }
             self.checkAutoBackup(using: encoded)
         }
-        postExternalUpdate(fullReload: false, source: "operationReward")
+        if let source { postExternalUpdate(fullReload: false, source: source) }
         return true
     }
     

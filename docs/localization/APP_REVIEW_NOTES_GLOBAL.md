@@ -1,7 +1,7 @@
 # App Review Notes — Global Expansion
 
 > 粘贴至 App Store Connect → App Review Information → Notes  
-> 版本：2.8 | App ID：6758352161 | 更新：2026-07-03
+> App ID：6758352161。上传前核对当前构建、地区、政策页面和 Sandbox 结果，见[本次核验](./runs/2026-11-03/RESULT.md)。
 
 ---
 
@@ -15,7 +15,7 @@ MONETIZATION — IMPORTANT FOR REVIEW:
 • VIP membership, theme skins, and pet shop items are purchased INSIDE the app using Meow Coins — they are NOT separate IAP products.
 • VIP is NOT an auto-renewable subscription. Users manually exchange Meow Coins for VIP duration (e.g., 1 month). When VIP expires, nothing renews automatically.
 • First purchase of each coin tier grants double base coins (per tier, tracked independently). Repeat purchases include tier bonus percentages (10%–35%).
-• Virtual items cannot be refunded or converted to real currency.
+• Meow Coins and virtual items cannot be converted to cash.
 
 HOW TO TEST IAP:
 1. Open app → tab "Me" (我) → Meow Coin Store (喵币商店)
@@ -43,12 +43,6 @@ DATA & PRIVACY:
 
 AI FEATURES:
 • Optional AI styling suggestions and pet chat may call third-party AI APIs. Described in Privacy Policy. We do NOT use data for tracking (NSPrivacyTracking = false).
-
-ACCOUNT:
-• [If demo account required, fill in below]
-• Demo Apple ID: _______________
-• Password: _______________
-• Steps: _______________
 
 CHINA MAINLAND:
 • App is already live on China mainland storefront. This submission expands availability to additional regions with the same IAP product IDs and VIP model.

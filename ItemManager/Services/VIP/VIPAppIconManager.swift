@@ -35,10 +35,18 @@ final class VIPAppIconManager: ObservableObject {
     let availableIcons: [VIPAppIconOption] = [
         VIPAppIconOption(
             id: "primary",
+            displayName: "一柜春光",
+            subtitle: "把喜欢的衣裙，收进日常的春光里。",
+            previewAssetName: "vip_icon_preview_spring",
+            alternateIconName: nil,
+            badgeText: nil
+        ),
+        VIPAppIconOption(
+            id: "classic_wardrobe",
             displayName: "少女心愿立体",
             subtitle: "经典衣橱主视觉，甜美又有辨识度",
             previewAssetName: "vip_icon_preview_logo",
-            alternateIconName: nil,
+            alternateIconName: "少女心愿logo",
             badgeText: "经典"
         ),
         VIPAppIconOption(
@@ -104,6 +112,7 @@ final class VIPAppIconManager: ObservableObject {
             return (false, "这台设备暂时不能切换桌面图标。".appLocalized)
         }
 
+        refreshCurrentIcon()
         guard currentIconID != option.id else {
             return (true, "你已经在使用「%@」了。".appLocalized(option.localizedDisplayName))
         }
@@ -117,6 +126,10 @@ final class VIPAppIconManager: ObservableObject {
             refreshCurrentIcon()
             return (true, "已切换为「%@」。".appLocalized(option.localizedDisplayName))
         } catch {
+            refreshCurrentIcon()
+            if currentIconID == option.id {
+                return (true, "已切换为「%@」。".appLocalized(option.localizedDisplayName))
+            }
             return (false, errorMessage(for: error, option: option))
         }
 #else

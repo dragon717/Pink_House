@@ -1,6 +1,6 @@
-# App Store Metadata — Traditional Chinese (zh-Hant)
+# App Store Metadata — 繁體中文
 
-> 粘贴至 App Store Connect → 繁體中文（台灣/香港/澳門）
+> ASC locale `zh-Hant` · App ID `6758352161`。更新说明用于包含本次本地化改动的新构建。
 
 ## App Information
 
@@ -11,39 +11,20 @@
 | **Privacy Policy URL** | https://sangsang.online/privacy/ |
 | **Support URL** | https://sangsang.online/contact/ |
 
+## Promotional Text
+
+幫新裙子拍張照，記下尺寸和訂金。想查尾款哪天付，或回顧上次怎麼搭配，打開衣櫥就能找到。
+
 ## Description
 
-少女心願是你的數位衣櫥與虛擬萌寵夥伴。
+幫裙子拍張照，把尺寸、標籤和購買資訊收進衣櫥。預購的裙子可以分開記錄訂金和尾款，查看待付金額。把穿過的搭配存進手帳，隨時回顧。
 
-整理衣櫥、記錄穿搭與尾款、撰寫穿搭手帳，並在溫馨小世界中養育可愛萌寵。使用主題皮膚裝扮 App，解鎖 VIP 特權，享受 AI 穿搭建議。
-
-**虛擬貨幣：** 透過 App 內購買「喵幣」，用於解鎖主題、寵物道具與 VIP 時長。VIP 需以喵幣**手動兌換**，**非**自動續費訂閱。
-
-**功能亮点：**
-- 衣櫥管理：照片、標籤、篩選
-- 財富頁：尾款與消費統計
-- 穿搭手帳與分享
-- 虛擬萌寵互動與聊天
-- 主題皮膚與季節裝飾
-- iCloud 同步
-
-虛擬商品不可退款、不可兌換現金。詳見隱私政策與用戶協議。
-
-聯絡：huangsangmuniao@126.com
+在時光館瀏覽裙款，把喜歡的款式加入衣櫥。你可以透過 App 內購買取得喵幣，兌換虛擬物品或固定期間的 VIP 權益。會員到期後可手動兌換續期。
 
 ## Keywords
 
 衣櫥,穿搭,手帳,萌寵,虛擬寵物,時尚,OOTD,整理,尾款,喵幣
 
-## Promotional Text
-
-全新主題皮膚上線——裝扮你的衣櫥與萌寵！
-
 ## What's New
 
-- 全球上架與多語言優化
-- 問題修復與效能提升
-
-## Screenshot Checklist
-
-App 語言切換為 **繁體中文** 後截圖：衣櫥、財富、House、喵幣商店、VIP 中心。
+改善底部分頁與系統權限提示的多語言顯示。

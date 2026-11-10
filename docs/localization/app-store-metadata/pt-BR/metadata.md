@@ -1,30 +1,30 @@
-# App Store Metadata — Portuguese (Brazil) (pt-BR)
+# App Store Metadata — Português (Brasil)
+
+> ASC locale `pt-BR` · App ID `6758352161`。更新说明用于包含本次本地化改动的新构建。
 
 ## App Information
 
 | Field | Content |
 |-------|---------|
-| **Name** | Pink House |
-| **Subtitle** | Guarda-roupa, pets e diário de looks |
+| **Name** | 少女心愿 |
+| **Subtitle** | Guarda-roupa e diário de looks |
 | **Privacy Policy URL** | https://sangsang.online/en/privacy/ |
 | **Support URL** | https://sangsang.online/en/contact/ |
 
+## Promotional Text
+
+Guarde uma foto de cada vestido com o tamanho e o sinal pago. Confira quando vence o saldo e relembre no diário o look que você montou com a peça.
+
 ## Description
 
-Pink House é seu guarda-roupa digital e companheiro de pet virtual.
+Fotografe suas roupas e guarde o tamanho, as etiquetas e os detalhes da compra. Nas encomendas, registre o sinal e o valor que falta pagar. Use o diário de looks para rever o que vestiu em cada dia.
 
-Organize roupas, acompanhe parcelas e saldos, mantenha um diário de looks e cuide de pets fofos. Personalize com temas, desbloqueie VIP e use sugestões de estilo com IA.
-
-**Moeda virtual:** Compre Meow Coins via compra no app para temas, itens e tempo VIP. VIP é obtido por **troca manual** de Meow Coins — **não** é assinatura auto-renovável.
-
-Itens virtuais não reembolsáveis.
-
-Contato: huangsangmuniao@126.com
+Explore a Galeria do tempo e adicione seus vestidos favoritos ao guarda-roupa. Você pode comprar Meow Coins no app e trocá-las por itens virtuais ou por acesso VIP por um período determinado. Os benefícios terminam ao fim desse período.
 
 ## Keywords
 
 guarda-roupa,look,moda,pet,virtual,diário,OOTD,organizar
 
-## Screenshot
+## What's New
 
-Idioma do app = português (Brasil): guarda-roupa, finanças, House, loja, VIP.
+As abas de navegação e os avisos de permissão do sistema agora estão disponíveis em português.

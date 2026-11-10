@@ -143,7 +143,7 @@ struct DepositItemRow: View {
 
                 Divider()
 
-                VStack(spacing: 12) {
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 12) {
                     if clothing.isFullPaymentReservation {
                         TimelineRow(title: "全款预约", date: clothing.depositDate, trailing: getFullPaymentReservationStatus())
                     } else {
@@ -465,13 +465,13 @@ struct TimelineRow: View {
     var trailing: String? = nil
 
     var body: some View {
-        HStack {
+        GridRow {
             Text(title.appLocalized)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundStyle(themeManager.primaryTextColor)
                 .themeSkinLegibleText(level: .inline, slot: .sectionCard)
-                .frame(width: 40, alignment: .leading)
+                .layoutPriority(1)
 
             if let date = date {
                 Text(formatDate(date))
@@ -485,7 +485,7 @@ struct TimelineRow: View {
                     .themeSkinLegibleText(level: .inline, slot: .sectionCard)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             if let trailing = trailing {
                 Text(trailing)

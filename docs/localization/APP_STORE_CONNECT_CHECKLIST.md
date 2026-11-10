@@ -1,8 +1,8 @@
 # App Store Connect 全球扩区 Checklist
 
 > 用途：在 ASC 后台逐项勾选，配合 [LOCALE_MATRIX.md](./LOCALE_MATRIX.md) 记录 `last_checked`。  
-> App ID：`6758352161` | Bundle ID：`bugod2.ItemManager` | 当前 Marketing Version：`2.8`  
-> 更新时间：2026-07-03
+> App ID：`6758352161` | Bundle ID：`bugod2.ItemManager`。当前候选版本与执行状态见[上架记录](./runs/2026-11-03/RESULT.md)。
+> 2026-11-04 发布决定：**4.4（2）禁止正式提审**。4.4（3）本地 StoreKit 防重测试 2/2 通过，01:15:31（北京时间）上传成功，TestFlight 后台已列出构建 3，状态为「准备提交」。海外版本尚未提审，TestFlight 实购、生产购买及地区开放待后台完成。[核验记录](./runs/2026-11-03/RESULT.md)
 
 ---
 
@@ -28,8 +28,8 @@
 
 | # | 项 | 状态 | 备注 |
 |---|-----|------|------|
-| 1.1 | 中国大陆保持已选 | ☐ | 勿误取消 |
-| 1.2 | 勾选 **其余全部** 国家/地区 | ☐ | 或以 Apple 当前列表「Select All」 |
+| 1.1 | 中国大陆保持已选 | 已核 | 后台为 1/175 可供应，公开目录仅中国大陆有结果。 |
+| 1.2 | 勾选全部可售国家和地区 | ☐ | 保留已有地区，先核对 ASC 提示和待补材料，逐区记录例外 |
 | 1.3 | 分发类型 = 正式版（非 Pre-Order） | ☐ | |
 | 1.4 | 记录扩区日期到 LOCALE_MATRIX | ☐ | `last_checked: YYYY-MM-DD` |
 
@@ -61,11 +61,11 @@
 
 | # | 项 | 状态 |
 |---|-----|------|
-| 2.1 | Type = **Consumable** | ☐ ×6 |
-| 2.2 | Status = Ready to Submit / Approved | ☐ ×6 |
-| 2.3 | **Availability** = 与 App 完全一致（全球） | ☐ ×6 |
-| 2.4 | **Price Schedule** 已设且全球 storefront 生效 | ☐ ×6 |
-| 2.5 | 各 metadata 语言 Display Name + Description | ☐ 见 iap-localizations.md |
+| 2.1 | Type = **Consumable** | 六档均已核实。 |
+| 2.2 | Status = Ready to Submit / Approved | 六个商品本身均为已批准。新增语言另有审核状态。 |
+| 2.3 | **Availability** 与预计开放范围一致 | 主 App 为 1/175，六档内购均为相同的 133/175。未选的 42 个地区见[后台核验表](./runs/2026-11-03/RESULT.md#六档喵币的后台状态2026-11-04)。 |
+| 2.4 | **Price Schedule** 已设且全球 storefront 生效 | 美国商店已拉取全部 6 档 USD 显示价，全球价格安排待后台核对。[拉取记录](../../output/app-store-4.4/proof/us-storekit-products.txt) |
+| 2.5 | 各 metadata 语言 Display Name + Description | 54 组源稿已备，49 组已在后台回读。300 档仍有 5 语待解锁后录入。逐档审核状态见[逐档记录](./runs/2026-11-03/RESULT.md#六档喵币的后台状态2026-11-04)。 |
 | 2.6 | **Review Screenshot**（App 内购买/使用喵币场景） | ☐ ×6 |
 | 2.7 | 与代码 `IAPProduct.swift` Product ID 一致 | ☐ |
 
@@ -105,13 +105,15 @@ Redeem URL 模板：`https://apps.apple.com/redeem?ctx=offercodes&id=6758352161&
 
 ## Phase 5 — Metadata 与截图
 
+[九语商店填报包](../../output/app-store-4.4/少女心愿-4.4-九语商店资料.zip)已校验。4.4 九语商品页、名称和副标题已在后台保存并刷新回读。
+
 | # | 项 | 状态 | 源稿 |
 |---|-----|------|------|
-| 5.1 | en 全套 metadata + 截图 | ☐ | [app-store-metadata/en/](./app-store-metadata/en/) |
-| 5.2 | zh-Hant 全套 | ☐ | [app-store-metadata/zh-Hant/](./app-store-metadata/zh-Hant/) |
-| 5.3 | ja / ko | ☐ | 各语言目录 |
-| 5.4 | fr / de / es / pt-BR | ☐ | 各语言目录 |
-| 5.5 | 截图 UI 语言与 metadata 语言一致 | ☐ | |
+| 5.1 | en 全套 metadata + 截图 | 文案已保存，含 Duo 的 14 张图已逐槽回读 | [app-store-metadata/en/](./app-store-metadata/en/) |
+| 5.2 | zh-Hant 全套 | 文案已保存，含 Duo 的 14 张图已逐槽回读 | [app-store-metadata/zh-Hant/](./app-store-metadata/zh-Hant/) |
+| 5.3 | ja / ko | 商品页已保存，iPad 槽已回读「使用现有素材」与三张图。六档内购见 2.5 | 各语言目录 |
+| 5.4 | fr / de / es / pt-BR | 商品页已保存，iPad 槽已回读「使用现有素材」与三张图。六档内购见 2.5 | 各语言目录 |
+| 5.5 | 截图 UI 语言与 metadata 语言一致 | 简中 15 张、繁中和英文各 14 张，均已上传并回读 | [43 张截图包](../../output/app-store-4.4/少女心愿-4.4-商店截图.zip) |
 
 ---
 

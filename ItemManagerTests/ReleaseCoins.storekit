@@ -1,0 +1,105 @@
+{
+  "identifier": "5BF4CF48-BBDA-4DA7-ABF0-1675BF2A5D01",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "6.00",
+      "familyShareable": false,
+      "internalID": "100001",
+      "localizations": [
+        {
+          "description": "Local test currency pack",
+          "displayName": "60 Meow Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.pinkhouse.app.meowcoin_60",
+      "referenceName": "60 Meow Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "12.00",
+      "familyShareable": false,
+      "internalID": "100002",
+      "localizations": [
+        {
+          "description": "Local test currency pack",
+          "displayName": "120 Meow Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.pinkhouse.app.meowcoin_120",
+      "referenceName": "120 Meow Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "30.00",
+      "familyShareable": false,
+      "internalID": "100003",
+      "localizations": [
+        {
+          "description": "Local test currency pack",
+          "displayName": "300 Meow Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.pinkhouse.app.meowcoin_300",
+      "referenceName": "300 Meow Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "50.00",
+      "familyShareable": false,
+      "internalID": "100004",
+      "localizations": [
+        {
+          "description": "Local test currency pack",
+          "displayName": "500 Meow Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.pinkhouse.app.meowcoin_500",
+      "referenceName": "500 Meow Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "128.00",
+      "familyShareable": false,
+      "internalID": "100005",
+      "localizations": [
+        {
+          "description": "Local test currency pack",
+          "displayName": "1280 Meow Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.pinkhouse.app.mcoin_1280",
+      "referenceName": "1280 Meow Coins",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "328.00",
+      "familyShareable": false,
+      "internalID": "100006",
+      "localizations": [
+        {
+          "description": "Local test currency pack",
+          "displayName": "3280 Meow Coins",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.pinkhouse.app.mcoin_3280",
+      "referenceName": "3280 Meow Coins",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_locale": "en_US",
+    "_storefront": "USA"
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

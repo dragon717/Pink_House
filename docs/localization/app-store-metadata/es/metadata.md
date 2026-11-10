@@ -1,30 +1,30 @@
-# App Store Metadata — Spanish (es)
+# App Store Metadata — Español (España)
+
+> ASC locale `es-ES` · App ID `6758352161`。更新说明用于包含本次本地化改动的新构建。
 
 ## App Information
 
 | Field | Content |
 |-------|---------|
-| **Name** | Pink House |
-| **Subtitle** | Armario, mascotas y diario de outfits |
+| **Name** | 少女心愿 |
+| **Subtitle** | Armario, mascotas y conjuntos |
 | **Privacy Policy URL** | https://sangsang.online/en/privacy/ |
 | **Support URL** | https://sangsang.online/en/contact/ |
 
+## Promotional Text
+
+Guarda una foto de cada vestido con su talla y la señal que pagaste. Consulta cuándo vence el saldo y recuerda cómo lo combinaste en tu diario de conjuntos.
+
 ## Description
 
-Pink House es tu armario digital y compañero de mascota virtual.
+Fotografía tus prendas y guarda la talla, las etiquetas y los detalles de compra. Para los pedidos anticipados, registra la señal y el saldo pendiente por separado. En tu diario puedes repasar los conjuntos que has llevado.
 
-Organiza tu ropa, registra pagos y depósitos, lleva un diario de outfits y cuida mascotas adorables. Personaliza con temas, desbloquea VIP y disfruta sugerencias de estilo con IA.
-
-**Moneda virtual:** Compra Meow Coins mediante compra integrada para temas, objetos y tiempo VIP. VIP se obtiene por **canje manual** — **no** es suscripción auto-renovable.
-
-Artículos virtuales no reembolsables.
-
-Contacto: huangsangmuniao@126.com
+Explora la Galería del tiempo y guarda tus vestidos favoritos en el armario. Puedes comprar Meow Coins en la app y canjearlas por artículos virtuales o por un periodo fijo de acceso VIP. El acceso caduca al final del periodo.
 
 ## Keywords
 
-armario,outfit,moda,mascota,virtual,diario,OOTD,organizar
+armario,ropa,conjunto,moda,mascota,diario,OOTD,organizar
 
-## Screenshot
+## What's New
 
-Idioma de la app = español: armario, finanzas, House, tienda, VIP.
+Las pestañas de navegación y los mensajes de permisos del sistema ya están disponibles en español.

@@ -2316,15 +2316,23 @@ struct WardrobeView: View {
 
         return ThemeSkinEmptyStateSurface(cornerRadius: 24) {
             VStack(spacing: 16) {
-                Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "hanger")
-                    .font(.system(size: 32, weight: .semibold))
-                    .foregroundStyle(palette.accent)
-                    .themeSkinLegibleSymbol(level: .badge, slot: .emptyState)
-                    .padding(14)
-                    .background(
-                        Circle()
-                            .fill(palette.cardAccent.opacity(colorScheme == .dark ? 0.32 : 0.18))
-                    )
+                if !isFiltered && clothings.isEmpty && themeSkinManager.activeThemeId == nil {
+                    Image("WardrobeFirstHangers")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 220, maxHeight: 132)
+                        .accessibilityHidden(true)
+                } else {
+                    Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "hanger")
+                        .font(.system(size: 32, weight: .semibold))
+                        .foregroundStyle(palette.accent)
+                        .themeSkinLegibleSymbol(level: .badge, slot: .emptyState)
+                        .padding(14)
+                        .background(
+                            Circle()
+                                .fill(palette.cardAccent.opacity(colorScheme == .dark ? 0.32 : 0.18))
+                        )
+                }
 
                 VStack(spacing: 8) {
                     Text(isFiltered ? "没有符合条件的裙装".appLocalized : "衣橱还空着".appLocalized)
@@ -2803,9 +2811,7 @@ struct WardrobeStatsView: View {
                         VStack(spacing: 4) {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 20))
-                            Text("今日穿搭色".appLocalized)
-                                .font(.system(size: 11, weight: .medium))
-                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
+                            shortcutCaption("wardrobe.shortcut.dailyColor", accessibilityTitle: "今日穿搭色")
                         }
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -2836,11 +2842,7 @@ struct WardrobeStatsView: View {
                                                 .offset(x: 4, y: 3)
                                         }
                                     }
-                                Text("DIY搭配".appLocalized)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                                    .themeSkinLegibleText(level: .inline, slot: .statsCard)
+                                shortcutCaption("wardrobe.shortcut.diy", accessibilityTitle: "DIY搭配")
                             }
                             .padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
@@ -2863,9 +2865,7 @@ struct WardrobeStatsView: View {
                         VStack(spacing: 4) {
                             Image(systemName: "book.closed.fill")
                                 .font(.system(size: 20))
-                            Text("穿搭手帐".appLocalized)
-                                .font(.system(size: 11, weight: .medium))
-                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
+                            shortcutCaption("wardrobe.shortcut.journal", accessibilityTitle: "穿搭手帐")
                         }
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -2880,9 +2880,7 @@ struct WardrobeStatsView: View {
                         VStack(spacing: 4) {
                             Image(systemName: "chart.bar.fill")
                                 .font(.system(size: 20))
-                            Text("详细统计".appLocalized)
-                                .font(.system(size: 11, weight: .medium))
-                                .themeSkinLegibleText(level: .inline, slot: .statsCard)
+                            shortcutCaption("wardrobe.shortcut.stats", accessibilityTitle: "详细统计")
                         }
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
@@ -2891,6 +2889,7 @@ struct WardrobeStatsView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("wardrobe.detailedStats")
                 }
                 .frame(height: 54)
             }
@@ -2899,6 +2898,15 @@ struct WardrobeStatsView: View {
         .sheet(isPresented: $showDailyCheckIn) {
             DailyCheckInView()
         }
+    }
+
+    private func shortcutCaption(_ key: String, accessibilityTitle: String) -> some View {
+        Text(key.appLocalized)
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .themeSkinLegibleText(level: .inline, slot: .statsCard)
+            .accessibilityLabel(accessibilityTitle.appLocalized)
     }
 
     private func statItem(title: String, value: String, isVisible: Binding<Bool>, valueColor: Color? = nil) -> some View {

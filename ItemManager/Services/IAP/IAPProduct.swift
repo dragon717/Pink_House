@@ -152,6 +152,9 @@ struct MeowCoinAccount: Codable {
     // 每个商品档位的首充完成状态，key为productID
     var firstPurchaseCompletedByProduct: [String: Bool] = [:]
 
+    // 可选字段兼容旧版账户。
+    var pendingStoreCredit: IAPPurchaseRecord?
+
     static let storageKey = "MeowCoinAccount"
 }
 

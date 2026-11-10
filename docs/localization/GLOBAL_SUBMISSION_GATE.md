@@ -16,15 +16,16 @@
 | P0.3 | Privacy URL 全球 200 | curl en/privacy | ☐ |
 | P0.4 | App Privacy / Age / Export 已更新 | Phase 4 checklist | ☐ |
 | P0.5 | US Sandbox 至少 2 档 IAP 购买成功 | sandbox-iap-result | ☐ |
+| P0.6 | 同一笔喵币交易由监听和未完成交易补发路径重复送达时只入账一次，复购使用另一笔交易独立结算 | [2026-11-04 构建核验](./runs/2026-11-03/RESULT.md) | 4.4（2）失败，禁止正式提审。4.4（3）本地 StoreKit 测试通过（2/2，零跳过），P0.5 的美国 Sandbox 实购仍待验。 |
 
 ### P1 — 限制（P0 全过但 P1 未全过 = 可缩区发布，不建议一次性全球）
 
 | # | 条件 | Pass |
 |---|------|------|
-| P1.1 | en metadata + 截图完成 | ☐ |
-| P1.2 | zh-Hant metadata + 截图完成 | ☐ |
-| P1.3 | IAP 各语言 Display Name/Description 已粘贴 | ☐ |
-| P1.4 | Review Notes 已粘贴 | ☐ |
+| P1.1 | en metadata + 截图完成 | 4.4 草稿的商品页和四款设备的 12 张截图已回读。Duo 另行处理。 |
+| P1.2 | zh-Hant metadata + 截图完成 | 4.4 草稿的商品页和四款设备的 12 张截图已回读。Duo 另行处理。 |
+| P1.3 | IAP 各语言 Display Name/Description 已粘贴 | 部分填报。每档语言数量、审核状态及地区集合见[后台记录](./runs/2026-11-03/RESULT.md)。 |
+| P1.4 | Review Notes 已粘贴 | 4.4 草稿已保存审核备注。[后台验收记录](../../output/app-store-4.4/验收记录.md) |
 | P1.5 | KR/VN Legal 签字或明确排除这两国 | ☐ |
 | P1.6 | en 系统语言下 P0 页面无大块中文混语（知悉 ~1220 硬编码风险） | ☐ |
 

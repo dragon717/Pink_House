@@ -68,6 +68,15 @@ struct LiquidBackground: View {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                 }
+            } else if themeManager.effectiveBackgroundStyle == .color,
+                      themeManager.backgroundColorHex.uppercased() == "#F4DADB" {
+                LinearGradient(
+                    colors: [.white.opacity(colorScheme == .dark ? 0.045 : 0.42),
+                             .clear, .pink.opacity(colorScheme == .dark ? 0.045 : 0.065)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
             }
             
             // 2. Blur Layer (Material Overlay)

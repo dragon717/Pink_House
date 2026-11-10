@@ -167,7 +167,7 @@ struct SmallWidgetView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                WidgetOutlinedText(text: "本月", size: 12, weight: .bold)
+                WidgetOutlinedText(text: String(localized: "本月"), size: 12, weight: .bold)
                 Spacer()
             }
             .padding(.bottom, 4)
@@ -181,7 +181,7 @@ struct SmallWidgetView: View {
                 Spacer()
                 VStack(spacing: 0) {
                     WidgetOutlinedText(text: "\(monthData?.count ?? 0)", size: 28, weight: .heavy)
-                    WidgetOutlinedText(text: "件待付", size: 10, weight: .medium, color: .white.opacity(0.8))
+                    WidgetOutlinedText(text: String(localized: "件待付"), size: 10, weight: .medium, color: .white.opacity(0.8))
                 }
                 
                 Rectangle()
@@ -191,7 +191,7 @@ struct SmallWidgetView: View {
                 
                 VStack(spacing: 0) {
                     WidgetOutlinedText(text: "¥\((monthData?.totalBalance ?? 0).formatted(.number.notation(.compactName)))", size: 16, weight: .bold, color: .orange)
-                    WidgetOutlinedText(text: "尾款", size: 10, weight: .medium, color: .orange.opacity(0.8))
+                    WidgetOutlinedText(text: String(localized: "尾款"), size: 10, weight: .medium, color: .orange.opacity(0.8))
                 }
                 Spacer()
             }
@@ -214,9 +214,9 @@ struct MediumWidgetView: View {
                             .font(.caption)
                             .foregroundStyle(.white)
                         let currentYear = Calendar.current.component(.year, from: Date())
-                        WidgetOutlinedText(text: "\(currentYear)年月度心愿尾款", size: 14, weight: .bold)
+                        WidgetOutlinedText(text: String(localized: "\(String(currentYear))年月度心愿尾款"), size: 14, weight: .bold)
                     }
-                    WidgetOutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName))) · 总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 10, weight: .regular, color: .white.opacity(0.9))
+                    WidgetOutlinedText(text: String(localized: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName))) · 总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))"), size: 10, weight: .regular, color: .white.opacity(0.9))
                 }
                 Spacer()
             }
@@ -229,13 +229,13 @@ struct MediumWidgetView: View {
                 let displayMonths = entry.monthStats.filter { $0.month >= currentMonth }.prefix(4)
                 
                 if displayMonths.isEmpty {
-                    EmptyStateView(text: "本年暂无更多计划")
+                    EmptyStateView(text: String(localized: "本年暂无更多计划"))
                 } else {
                     ForEach(displayMonths, id: \.id) { data in
                         StatCard(
-                            title: "\(data.month)月",
+                            title: data.localizedMonthName,
                             value: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))",
-                            subValue: "\(data.count)件",
+                            subValue: String(localized: "\(data.count)件"),
                             highlight: data.month == currentMonth
                         )
                     }
@@ -266,17 +266,17 @@ struct LargeWidgetView: View {
                             .font(.title3)
                             .foregroundStyle(.white)
                         let currentYear = Calendar.current.component(.year, from: Date())
-                        WidgetOutlinedText(text: "\(currentYear)年度心愿尾款表", size: 20, weight: .heavy)
+                        WidgetOutlinedText(text: String(localized: "\(String(currentYear))年度心愿尾款表"), size: 20, weight: .heavy)
                     }
                     
                     HStack(spacing: 12) {
                         HStack(spacing: 4) {
                             Circle().fill(Color.pink).frame(width: 6, height: 6)
-                            WidgetOutlinedText(text: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))", size: 12)
+                            WidgetOutlinedText(text: String(localized: "总定金 ¥\(entry.totalDeposit.formatted(.number.notation(.compactName)))"), size: 12)
                         }
                         HStack(spacing: 4) {
                             Circle().fill(Color.orange).frame(width: 6, height: 6)
-                            WidgetOutlinedText(text: "总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))", size: 12)
+                            WidgetOutlinedText(text: String(localized: "总尾款 ¥\(entry.totalBalance.formatted(.number.notation(.compactName)))"), size: 12)
                         }
                     }
                 }
@@ -288,13 +288,13 @@ struct LargeWidgetView: View {
                 // Show all months with data
                 let months = entry.monthStats.filter { $0.count > 0 || $0.totalBalance > 0 }
                 if months.isEmpty {
-                    EmptyStateView(text: "暂无数据")
+                    EmptyStateView(text: String(localized: "暂无数据"))
                 } else {
                     ForEach(months.prefix(12), id: \.id) { data in
                         StatCard(
-                            title: "\(data.month)月",
+                            title: data.localizedMonthName,
                             value: "¥\(data.totalBalance.formatted(.number.notation(.compactName)))",
-                            subValue: "定金 ¥\(data.totalDeposit.formatted(.number.notation(.compactName)))",
+                            subValue: String(localized: "定金 ¥\(data.totalDeposit.formatted(.number.notation(.compactName)))"),
                             highlight: Calendar.current.component(.month, from: Date()) == data.month
                         )
                     }
@@ -303,6 +303,14 @@ struct LargeWidgetView: View {
             Spacer()
         }
         .padding(16)
+    }
+}
+
+private extension WidgetMonthInfo {
+    var localizedMonthName: String {
+        let months = Calendar.current.shortStandaloneMonthSymbols
+        guard month > 0, month <= months.count else { return month.formatted() }
+        return months[month - 1]
     }
 }
 

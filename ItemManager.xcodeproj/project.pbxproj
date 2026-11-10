@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		12026ABC0000000000000003 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 12026ABC0000000000000001 /* Localizable.xcstrings */; };
+		12026ABC0000000000000004 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 12026ABC0000000000000002 /* InfoPlist.strings */; };
 		A280DB932F443697002CBC10 /* GoogleGenerativeAI in Frameworks */ = {isa = PBXBuildFile; productRef = A280DB922F443697002CBC10 /* GoogleGenerativeAI */; };
 		A2AE59C32F1EB85300B4B6EB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C22F1EB85300B4B6EB /* WidgetKit.framework */; };
 		A2AE59C52F1EB85300B4B6EB /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A2AE59C42F1EB85300B4B6EB /* SwiftUI.framework */; };
@@ -69,6 +71,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		12026ABC0000000000000001 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		12026ABC0000000000000010 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		12026ABC0000000000000011 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		12026ABC0000000000000012 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
+		12026ABC0000000000000013 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		12026ABC0000000000000014 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		12026ABC0000000000000015 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		12026ABC0000000000000016 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		12026ABC0000000000000017 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		12026ABC0000000000000018 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		A2AE58732F19377500B4B6EB /* ItemManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ItemManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2AE58842F19377600B4B6EB /* ItemManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ItemManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2AE588E2F19377600B4B6EB /* ItemManagerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ItemManagerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -251,6 +263,8 @@
 			children = (
 				A2F14AE62F44A86C00BA78C6 /* ______.swift */,
 				A2F14AE72F44A86C00BA78C6 /* 少女心愿衣橱.entitlements */,
+				12026ABC0000000000000001 /* Localizable.xcstrings */,
+				12026ABC0000000000000002 /* InfoPlist.strings */,
 				A2F14AE82F44A86C00BA78C6 /* Assets.xcassets */,
 				A2F14AE92F44A86C00BA78C6 /* Info.plist */,
 				A2F14AEA2F44A86C00BA78C6 /* Provider.swift */,
@@ -500,6 +514,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				12026ABC0000000000000003 /* Localizable.xcstrings in Resources */,
+				12026ABC0000000000000004 /* InfoPlist.strings in Resources */,
 				A2F14AF82F44A86C00BA78C6 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -614,18 +630,37 @@
 		};
 /* End PBXTargetDependency section */
 
+/* Begin PBXVariantGroup section */
+		12026ABC0000000000000002 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				12026ABC0000000000000010 /* en */,
+				12026ABC0000000000000011 /* zh-Hans */,
+				12026ABC0000000000000012 /* zh-Hant */,
+				12026ABC0000000000000013 /* ja */,
+				12026ABC0000000000000014 /* ko */,
+				12026ABC0000000000000015 /* fr */,
+				12026ABC0000000000000016 /* de */,
+				12026ABC0000000000000017 /* es */,
+				12026ABC0000000000000018 /* pt-BR */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
 		A2AE58982F19377600B4B6EB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "VIPIconPinkWish VIPIconDreamCloset VIPIconPearlWardrobe VIPIconMoonWardrobe";
-				ASSETCATALOG_COMPILER_APPICON_NAME = "少女心愿logo";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "少女心愿logo VIPIconPinkWish VIPIconDreamCloset VIPIconPearlWardrobe VIPIconMoonWardrobe";
+				ASSETCATALOG_COMPILER_APPICON_NAME = SpringWardrobe;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = ItemManager/ItemManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -659,7 +694,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 4.3;
+				MARKETING_VERSION = 4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = bugod2.ItemManager;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -680,14 +715,14 @@
 		A2AE58992F19377600B4B6EB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "VIPIconPinkWish VIPIconDreamCloset VIPIconPearlWardrobe VIPIconMoonWardrobe";
-				ASSETCATALOG_COMPILER_APPICON_NAME = "少女心愿logo";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "少女心愿logo VIPIconPinkWish VIPIconDreamCloset VIPIconPearlWardrobe VIPIconMoonWardrobe";
+				ASSETCATALOG_COMPILER_APPICON_NAME = SpringWardrobe;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
 				CODE_SIGN_ENTITLEMENTS = ItemManager/ItemManagerProduction.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -721,7 +756,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 4.3;
+				MARKETING_VERSION = 4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = bugod2.ItemManager;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -964,7 +999,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "少女心愿衣橱/少女心愿衣橱.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "少女心愿衣橱/Info.plist";
@@ -976,7 +1011,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6;
+				MARKETING_VERSION = 4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = bugod2.ItemManager.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -998,7 +1033,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = "少女心愿衣橱/少女心愿衣橱.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = 833FJ74GS2;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "少女心愿衣橱/Info.plist";
@@ -1010,7 +1045,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.6;
+				MARKETING_VERSION = 4.4;
 				PRODUCT_BUNDLE_IDENTIFIER = bugod2.ItemManager.Widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;

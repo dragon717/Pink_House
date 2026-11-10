@@ -23,7 +23,7 @@
 
 1. **Pricing and Availability** → **Manage Availability**  
 2. **保留** 中国大陆勾选  
-3. 点击 **Select All**（或逐洲勾选除已禁售地区外全部）  
+3. 纳入全部可售地区。在 ASC 查看地区要求和状态，对待材料的地区逐项记录原因。
 4. **Save**  
 5. 确认 **Distribution** = 标准 App Store 分发  
 
@@ -62,7 +62,7 @@
 - 可在 ASC 对 **当前已批准版本** 扩展 availability（Apple 允许部分 metadata/availability 无需新版本）  
 - 若同时提交新 localization 截图或 binary 语言包，需 **新版本** 提审  
 
-> 以 ASC 当前 UI 提示为准；若有 doubt，准备 2.8.x build 一并提交。
+> 2026-11-03 的本地化改动随新构建交付。版本及进度见[本次上架记录](./runs/2026-11-03/RESULT.md)。
 
 ## 禁选地区
 

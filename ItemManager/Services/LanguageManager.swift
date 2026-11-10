@@ -123,8 +123,10 @@ class LanguageManager {
     }
 
     func localizedString(forKey key: String) -> String {
-        let value = localizedBundle.localizedString(forKey: key, value: nil, table: nil)
-        if value != key {
+        // 译文可能与原键相同，如日语“保存”。
+        let missing = "__PinkHouse_MissingLocalization__"
+        let value = localizedBundle.localizedString(forKey: key, value: missing, table: nil)
+        if value != missing {
             return value
         }
 

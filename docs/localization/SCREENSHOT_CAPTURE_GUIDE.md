@@ -1,6 +1,6 @@
 # App Store 截图采集指南 — 全球 metadata
 
-> 配合 [app-store-metadata/](../app-store-metadata/) 各语言 metadata  
+> 配合 [app-store-metadata/](./app-store-metadata/) 各语言 metadata
 > 更新：2026-07-03
 
 ## 原则
@@ -28,25 +28,13 @@ App → 设置 → 系统设置 → 界面语言 → 选择目标语言 → **�
 |---|------|----------|
 | 1 | 衣橱主页 | Tab 衣橱 |
 | 2 | 财富/尾款 | Tab 财富 |
-| 3 | 大世界 House | Tab House / 小世界 |
+| 3 | 时光馆 | 底部导航 → 时光馆 → 裙款目录 |
 | 4 | 喵币商店 | 我 → 喵币商店 |
 | 5 | VIP 中心 | 我 → VIP |
 
-## ASC 尺寸（以 Connect 当前必填为准）
+## 本次上传尺寸与采集
 
-- iPhone 6.7"（例如 iPhone 15 Pro Max / 16 Pro Max）  
-- iPhone 6.1"（例如 iPhone 15 Pro / 16 Pro）  
-
-验证路径：App Store Connect → 版本 → Screenshots → 查看 Required sizes
-
-## Simulator 命令参考
-
-```bash
-PROJ="/Users/muniao/Library/Mobile Documents/com~apple~CloudDocs/游戏/github/Pink_House"
-xcrun simctl boot "iPhone 16 Pro Max" 2>/dev/null || true
-# 构建安装见 AGENTS.md / xcode-development skill
-xcrun simctl io booted screenshot "/tmp/pink-house-screenshot-01-wardrobe.png"
-```
+主对话统一采集 iPhone 12、当前大屏 iPhone 和 iPad 素材并套框。按目标语言复用同一场景与设备，在当次运行索引中记录文件、语言、设备、像素和构建。Apple 要求的设备槽位以版本页和[官方规格](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)为准。
 
 ## 归档
 
@@ -63,7 +51,7 @@ xcrun simctl io booted screenshot "/tmp/pink-house-screenshot-01-wardrobe.png"
 |---|-----|---------|
 | 衣橱 | ☐ | ☐ |
 | 财富 | ☐ | ☐ |
-| House | ☐ | ☐ |
+| 时光馆 | ☐ | ☐ |
 | 喵币商店 | ☐ | ☐ |
 | VIP | ☐ | ☐ |
 | 已上传 ASC | ☐ | ☐ |

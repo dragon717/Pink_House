@@ -1,9 +1,9 @@
 "CFBundleDisplayName" = "Pink House";
-"NSCameraUsageDescription" = "Pink House needs camera access to take clothing photos and perform 3D scans.";
-"NSLocationWhenInUseUsageDescription" = "Pink House uses your location to provide location-based outfit recommendations.";
-"NSMicrophoneUsageDescription" = "Pink House needs microphone access for pet voice interactions and recording features.";
-"NSMotionUsageDescription" = "Pink House uses motion data to power the 3D parallax background effect.";
-"NSPhotoLibraryAddUsageDescription" = "Pink House needs photo library access to save images.";
-"NSPhotoLibraryUsageDescription" = "Pink House needs photo library access to choose clothing photos.";
-"NSSpeechRecognitionUsageDescription" = "Pink House uses speech recognition to convert voice to text for pet voice interactions and commands.";
-"NSWorldSensingUsageDescription" = "Pink House uses world sensing to perform 3D object scans.";
+"NSCameraUsageDescription" = "Pink Houseは服の写真撮影と3Dスキャンのためにカメラへのアクセスが必要です。";
+"NSLocationWhenInUseUsageDescription" = "Pink Houseは位置情報に基づくコーデ提案のために位置情報を使用します。";
+"NSMicrophoneUsageDescription" = "Pink Houseはペットとの音声交流と録音のためにマイクへのアクセスが必要です。";
+"NSMotionUsageDescription" = "Pink Houseは3Dパララックス背景のためにモーションデータを使用します。";
+"NSPhotoLibraryAddUsageDescription" = "Pink Houseは画像を保存するために写真ライブラリへのアクセスが必要です。";
+"NSPhotoLibraryUsageDescription" = "Pink Houseは服の写真を選ぶために写真ライブラリへのアクセスが必要です。";
+"NSSpeechRecognitionUsageDescription" = "Pink Houseはペットとの音声交流とコマンドのために音声認識を使用します。";
+"NSWorldSensingUsageDescription" = "Pink Houseは3D物体スキャンのためにワールドセンシングを使用します。";

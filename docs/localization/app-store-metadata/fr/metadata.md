@@ -1,30 +1,30 @@
-# App Store Metadata — French (fr)
+# App Store Metadata — Français (France)
+
+> ASC locale `fr-FR` · App ID `6758352161`。更新说明用于包含本次本地化改动的新构建。
 
 ## App Information
 
 | Field | Content |
 |-------|---------|
-| **Name** | Pink House |
-| **Subtitle** | Garde-robe, animaux & journal tenues |
+| **Name** | 少女心愿 |
+| **Subtitle** | Dressing et journal de tenues |
 | **Privacy Policy URL** | https://sangsang.online/en/privacy/ |
 | **Support URL** | https://sangsang.online/en/contact/ |
 
+## Promotional Text
+
+Gardez la photo et la taille de chaque robe. Pour une précommande, notez l’acompte et la date du solde. Votre journal garde le souvenir de vos tenues.
+
 ## Description
 
-Pink House est votre dressing numérique et compagnon animal virtuel.
+Photographiez vos vêtements et conservez leur taille, leurs étiquettes et les détails de vos achats. Pour les précommandes, notez l’acompte et le solde à régler. Retrouvez les tenues que vous avez portées dans votre journal.
 
-Organisez votre garde-robe, suivez vos achats et acomptes, tenez un journal de tenues et élevez d'adorables animaux. Personnalisez avec des thèmes, débloquez le VIP et profitez de suggestions de style IA.
-
-**Monnaie virtuelle :** Achetez des Meow Coins via achat intégré pour thèmes, objets et durée VIP. Le VIP s'obtient par **échange manuel** de Meow Coins — **pas** d'abonnement à renouvellement automatique.
-
-Articles virtuels non remboursables.
-
-Contact : huangsangmuniao@126.com
+Parcourez la Galerie du temps et ajoutez les robes qui vous plaisent à votre dressing. Les Meow Coins, disponibles via des achats intégrés, permettent d’obtenir des objets virtuels ou un accès VIP à durée déterminée. Cet accès prend fin au terme de la période choisie.
 
 ## Keywords
 
-garde-robe,tenue,mode,animal,virtuel,journal,OOTD,organiser
+garde-robe,tenue,mode,animal,virtuel,journal,OOTD,acompte
 
-## Screenshot
+## What's New
 
-Langue de l'app = français : garde-robe, finances, House, boutique, VIP.
+Les onglets de navigation et les demandes d’autorisation du système sont désormais disponibles en français.
