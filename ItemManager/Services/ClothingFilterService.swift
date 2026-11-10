@@ -28,7 +28,9 @@ class ClothingFilterService {
         let selectedConditions: Set<String>
         let selectedAccessories: Set<String>
         let depositStatusFilter: DepositStatusFilter
-        
+
+        var isActive: Bool { self != Self() }
+
         init(
             selectedTagIDs: Set<UUID> = [],
             selectedBrandIDs: Set<UUID> = [],
@@ -175,5 +177,34 @@ class ClothingFilterService {
     static func splitValues(_ string: String) -> Set<String> {
         let normalized = string.replacingOccurrences(of: "，", with: ",")
         return Set(normalized.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+    }
+}
+
+/// Shared by the asynchronous homepage projection and live model lists.
+nonisolated enum WardrobeBrandOrder {
+    static func precedes(id lhsID: UUID, brandID lhsBrand: UUID?, name lhsName: String?, createdAt lhsDate: Date,
+                         id rhsID: UUID, brandID rhsBrand: UUID?, name rhsName: String?, createdAt rhsDate: Date,
+                         preferredBrandID: String) -> Bool {
+        let lhsPreferred = lhsBrand?.uuidString == preferredBrandID
+        let rhsPreferred = rhsBrand?.uuidString == preferredBrandID
+        if lhsPreferred != rhsPreferred { return lhsPreferred }
+        if (lhsBrand == nil) != (rhsBrand == nil) { return lhsBrand != nil }
+        if lhsBrand != rhsBrand {
+            let comparison = (lhsName ?? "").localizedStandardCompare(rhsName ?? "")
+            if comparison != .orderedSame { return comparison == .orderedAscending }
+            return (lhsBrand?.uuidString ?? "") < (rhsBrand?.uuidString ?? "")
+        }
+        if lhsDate != rhsDate { return lhsDate > rhsDate }
+        return lhsID.uuidString < rhsID.uuidString
+    }
+}
+
+extension ClothingFilterService {
+    static func sortByBrand(_ clothings: [Clothing], preferredBrandID: String) -> [Clothing] {
+        clothings.sorted {
+            WardrobeBrandOrder.precedes(id: $0.id, brandID: $0.brand?.id, name: $0.brand?.name, createdAt: $0.createdAt,
+                                       id: $1.id, brandID: $1.brand?.id, name: $1.brand?.name, createdAt: $1.createdAt,
+                                       preferredBrandID: preferredBrandID)
+        }
     }
 }

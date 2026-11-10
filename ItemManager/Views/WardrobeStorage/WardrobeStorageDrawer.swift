@@ -2,6 +2,9 @@ import SwiftUI
 import SwiftData
 
 struct WardrobeStorageDrawer: View {
+    var filterConfig = ClothingFilterService.FilterConfig()
+    @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
+    @AppStorage("UserPreference_PreferredBrandID") private var preferredBrandID = ""
     @Query(sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(ThemeManager.self) private var themeManager
@@ -15,12 +18,20 @@ struct WardrobeStorageDrawer: View {
     let onClose: () -> Void
     let onSelect: (WardrobeStorageDestination) -> Void
 
+    private var visibleClothings: [Clothing] {
+        let filtered = ClothingFilterService.filter(clothings, config: filterConfig)
+        if sortOption == .brand {
+            return ClothingFilterService.sortByBrand(filtered, preferredBrandID: preferredBrandID)
+        }
+        return filtered.sorted(using: sortOption.sortDescriptors)
+    }
+
     private var palette: WardrobeStoragePalette {
         .themed(themeManager, scheme: colorScheme, contrast: contrast)
     }
 
     var body: some View {
-        let inventory = WardrobeStorageInventory.entries(clothings: clothings, customCabinets: storageSettings.cabinets)
+        let inventory = WardrobeStorageInventory.entries(clothings: visibleClothings, customCabinets: storageSettings.cabinets)
         GeometryReader { geometry in
             let width = min(330, geometry.size.width * 0.80)
             ZStack(alignment: .trailing) {

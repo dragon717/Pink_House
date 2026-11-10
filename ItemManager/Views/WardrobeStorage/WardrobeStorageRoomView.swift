@@ -8,6 +8,10 @@ struct WardrobeStorageRoomView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorSchemeContrast) private var contrast
+    var filterConfig = ClothingFilterService.FilterConfig()
+    var filterDescription: String?
+    @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
+    @AppStorage("UserPreference_PreferredBrandID") private var preferredBrandID = ""
     @Query(sort: \Clothing.createdAt, order: .reverse) private var clothings: [Clothing]
     @Query(sort: \CutoutItem.timestamp, order: .reverse) private var cutouts: [CutoutItem]
     @AppStorage("privacyShowPrice") private var showPrice = true
@@ -26,7 +30,9 @@ struct WardrobeStorageRoomView: View {
     @State private var imageFailureCount = 0
     @State private var preparationID = UUID()
 
-    init(destination: WardrobeStorageDestination) {
+    init(destination: WardrobeStorageDestination, filterConfig: ClothingFilterService.FilterConfig = .init(), filterDescription: String? = nil) {
+        self.filterDescription = filterDescription
+        self.filterConfig = filterConfig
         _selectedDestination = State(initialValue: destination)
     }
 
@@ -38,12 +44,20 @@ struct WardrobeStorageRoomView: View {
     }
     private var category: WardrobeStorageCategory { destination.category }
 
+    private var visibleClothings: [Clothing] {
+        let filtered = ClothingFilterService.filter(clothings, config: filterConfig)
+        if sortOption == .brand {
+            return ClothingFilterService.sortByBrand(filtered, preferredBrandID: preferredBrandID)
+        }
+        return filtered.sorted(using: sortOption.sortDescriptors)
+    }
+
     private var palette: WardrobeStoragePalette {
         .themed(themeManager, scheme: colorScheme, contrast: contrast)
     }
 
     var body: some View {
-        let inventory = WardrobeStorageInventory.entries(clothings: clothings, cutouts: cutouts, customCabinets: storageSettings.cabinets)
+        let inventory = WardrobeStorageInventory.entries(clothings: visibleClothings, cutouts: cutouts, customCabinets: storageSettings.cabinets)
         let collection = inventory.filter { $0.storageID == destination.id }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayed = collection.filter { query.isEmpty || $0.searchTerms.localizedCaseInsensitiveContains(query) }
@@ -56,6 +70,14 @@ struct WardrobeStorageRoomView: View {
                 categoryRail
                 VStack(spacing: 10) {
                     roomHeader(count: collection.reduce(0) { $0 + $1.quantity }, pendingCount: collection.filter { $0.statusLabel != nil }.count)
+                    if filterConfig.isActive {
+                        Label(filterDescription ?? "筛选".appLocalized, systemImage: "line.3.horizontal.decrease")
+                            .font(.system(size: 12))
+                            .foregroundStyle(palette.secondary.color)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(6)
+                            .background(palette.label.color, in: RoundedRectangle(cornerRadius: 10))
+                    }
                     if listMode {
                         searchField
                     }
@@ -71,7 +93,7 @@ struct WardrobeStorageRoomView: View {
                     GeometryReader { geometry in
                         let width = min(geometry.size.width, 520)
                         Group {
-                            if displayed.isEmpty && !query.isEmpty {
+                            if displayed.isEmpty && (!query.isEmpty || filterConfig.isActive) {
                                 emptySearch
                             } else if !listMode {
                                 WardrobeStorageCabinet(category: category, entries: displayed, width: width, height: geometry.size.height, showPrice: showPrice, onSelect: select)
@@ -296,9 +318,14 @@ struct WardrobeStorageRoomView: View {
         ContentUnavailableView {
             Label("没有找到这件收藏".appLocalized, systemImage: "magnifyingglass")
         } description: {
-            Text("换个关键词，或看看全部收藏。".appLocalized)
+            Text((filterConfig.isActive ? "返回衣橱调整筛选条件，或更换搜索关键词。" : "换个关键词，或看看全部收藏。").appLocalized)
         } actions: {
-            Button("清除搜索".appLocalized) { searchText = "" }
+            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Button("清除搜索".appLocalized) { searchText = "" }
+            }
+            if filterConfig.isActive {
+                Button("返回衣橱".appLocalized) { dismiss() }
+            }
         }
         .background(palette.label.color, in: RoundedRectangle(cornerRadius: 20))
     }

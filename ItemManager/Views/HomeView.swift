@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import CoreData
 import UIKit
 
 enum SortOption: String, CaseIterable, Identifiable, Hashable, Sendable {
@@ -18,6 +19,7 @@ enum SortOption: String, CaseIterable, Identifiable, Hashable, Sendable {
     case purchaseDateDesc = "购买时间从晚到早"
     case nameAsc = "名称从A到Z"
     case nameDesc = "名称从Z到A"
+    case brand = "店家排序"
     case custom = "自定义顺序"
     
     var id: String { rawValue }
@@ -28,7 +30,7 @@ enum SortOption: String, CaseIterable, Identifiable, Hashable, Sendable {
 
     var sortDescriptors: [SortDescriptor<Clothing>] {
         switch self {
-        case .createdAtDesc:
+        case .createdAtDesc, .brand:
             return [SortDescriptor(\Clothing.createdAt, order: .reverse)]
         case .priceAsc:
             return [SortDescriptor(\Clothing.price, order: .forward)]
@@ -181,11 +183,15 @@ private final class WardrobeMenuFacetCache: ObservableObject {
 
         refreshTask = Task.detached(priority: .utility) {
             let snapshot = WardrobeMenuFacetCache.buildSnapshot(from: sourceKey)
-            await MainActor.run {
-                guard !Task.isCancelled else { return }
-                self.apply(snapshot)
-            }
+            guard !Task.isCancelled else { return }
+            await self.applyIfCurrent(snapshot, sourceKey: sourceKey)
         }
+    }
+
+    @MainActor
+    private func applyIfCurrent(_ snapshot: WardrobeMenuFacetSnapshot, sourceKey: WardrobeMenuFacetSourceKey) {
+        guard sourceKey == lastSourceKey else { return }
+        apply(snapshot)
     }
 
     func options(for field: ClothingField) -> [String] {
@@ -436,6 +442,7 @@ struct HomeView: View {
     @State private var isEditing = false
     @State private var isSearchActive = false
     @FocusState private var isWardrobeSearchFocused: Bool
+    @AppStorage("UserPreference_PreferredBrandID") private var preferredBrandID = ""
     @AppStorage("UserPreference_SortOption") private var sortOption: SortOption = .createdAtDesc
     @AppStorage("UserPreference_WardrobeNavigationStyle") private var wardrobeNavigationStyle: WardrobeNavigationStyle = .classic
     @AppStorage("UserPreference_FilterMode") private var filterMode: FilterMode = .classic
@@ -514,21 +521,31 @@ struct HomeView: View {
         MagicThemeDesignSystem.palette(themeManager: themeManager, colorScheme: colorScheme)
     }
 
-    private func makeMenuFacetSourceKey() -> WardrobeMenuFacetSourceKey {
+    private func makeMenuFacetSourceKey() async -> WardrobeMenuFacetSourceKey? {
         let descriptor = FetchDescriptor<Clothing>(
             predicate: #Predicate { $0.deletedAt == nil }
         )
         let clothings = (try? modelContext.fetch(descriptor)) ?? []
 
+        var rows: [WardrobeMenuFacetClothingRow] = []
+        rows.reserveCapacity(clothings.count)
+        for (offset, clothing) in clothings.enumerated() {
+            guard !Task.isCancelled else { return nil }
+            rows.append(WardrobeMenuFacetClothingRow(clothing))
+            if offset % 64 == 63 { await Task.yield() }
+        }
         return WardrobeMenuFacetSourceKey(
-            clothings: clothings.map(WardrobeMenuFacetClothingRow.init),
+            clothings: rows,
             tags: tags.map { WardrobeMenuFacetNamedRow(id: $0.id, name: $0.name, lastModified: $0.lastModified) },
             brands: brands.map { WardrobeMenuFacetNamedRow(id: $0.id, name: $0.name, lastModified: $0.lastModified) }
         )
     }
 
-    private func refreshMenuFacetCache() {
-        menuFacetCache.refresh(from: makeMenuFacetSourceKey())
+    @State private var menuFacetRevision = 0
+
+    private func refreshMenuFacetCache() async {
+        guard let source = await makeMenuFacetSourceKey(), !Task.isCancelled else { return }
+        menuFacetCache.refresh(from: source)
     }
 
     private var themedTopBarGroupDescriptor: ThemeSkinDescriptor? {
@@ -704,7 +721,7 @@ struct HomeView: View {
                 BatchImportView()
             }
             .navigationDestination(item: $storageCategory) { category in
-                WardrobeStorageRoomView(destination: category)
+                WardrobeStorageRoomView(destination: category, filterConfig: storageFilterConfig, filterDescription: getFilterDescription())
             }
             .onChange(of: showingBatchImportSheet) { _, newValue in
                 if newValue {
@@ -765,6 +782,15 @@ struct HomeView: View {
             .toolbarColorScheme(topBarToolbarColorScheme, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .tint(topBarAccentForeground)
+            .task(id: menuFacetRevision) {
+                await refreshMenuFacetCache()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in
+                menuFacetRevision += 1
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSPersistentStoreRemoteChange)) { _ in
+                menuFacetRevision += 1
+            }
             .onAppear {
                 // 确保初始状态下搜索栏不显示
                 isSearchActive = false
@@ -845,7 +871,7 @@ struct HomeView: View {
         .accessibilityHidden(showingStorageDrawer)
         .overlay {
             if showingStorageDrawer {
-                WardrobeStorageDrawer(onClose: closeStorageDrawer) { category in
+                WardrobeStorageDrawer(filterConfig: storageFilterConfig, onClose: closeStorageDrawer) { category in
                     closeStorageDrawer()
                     if category.id != WardrobeStorageCategory.wardrobe.rawValue { storageCategory = category }
                 }
@@ -1345,6 +1371,14 @@ struct HomeView: View {
         }
     }
 
+    private var storageFilterConfig: ClothingFilterService.FilterConfig {
+        .init(selectedTagIDs: selectedTagIDs, selectedBrandIDs: selectedBrandIDs,
+              selectedTypes: selectedTypes, selectedColors: selectedColors,
+              selectedSizes: selectedSizes, selectedLengths: selectedLengths,
+              selectedConditions: selectedConditions, selectedAccessories: selectedAccessories,
+              depositStatusFilter: depositStatusFilter)
+    }
+
     private var sortButton: some View {
         // menu-perf: wardrobe sort menu
         Menu {
@@ -1355,6 +1389,28 @@ struct HomeView: View {
                         .themeSkinLegibleText(level: .inline, slot: .filterChip)
                         .tag(option)
                 }
+            }
+            Menu {
+                Button {
+                    preferredBrandID = ""
+                    sortOption = .brand
+                } label: {
+                    Label("按店家名称".appLocalized, systemImage: sortOption == .brand && preferredBrandID.isEmpty ? "checkmark" : "storefront")
+                }
+                ForEach(menuFacetCache.brandOptions, id: \.id) { brand in
+                    Button {
+                        preferredBrandID = brand.id.uuidString
+                        sortOption = .brand
+                    } label: {
+                        if sortOption == .brand && preferredBrandID == brand.id.uuidString {
+                            Label(brand.name, systemImage: "checkmark")
+                        } else {
+                            Text(brand.name)
+                        }
+                    }
+                }
+            } label: {
+                Label("优先显示的店家".appLocalized, systemImage: "storefront")
             }
         } label: {
             HomeThemeSkinToolbarIconShell(descriptor: themedTopBarButtonDescriptor) {
@@ -1373,7 +1429,6 @@ struct HomeView: View {
             if filterMode == .multiDimensional {
                 // 多维筛选模式 - 使用Sheet
                 Button {
-                    refreshMenuFacetCache()
                     _ = MenuPerfSignpost.menuOpen("wardrobe.multi_filter.sheet_open")
                     showingMultiDimensionalFilterSheet = true
                 } label: {
@@ -1556,7 +1611,6 @@ struct HomeView: View {
         } label: {
             filterButtonLabel
                 .onTapGesture {
-                    refreshMenuFacetCache()
                     _ = MenuPerfSignpost.menuOpen("wardrobe.filter")
                 }
         }

@@ -94,4 +94,91 @@ final class WardrobeStorageInventoryTests: XCTestCase {
         XCTAssertTrue(Set(home.ids).isDisjoint(with: cabinets.compactMap { $0.clothing?.id }))
         XCTAssertEqual(Set(home.ids + cabinets.compactMap { $0.clothing?.id }), Set(items.map(\.id)))
     }
+    func testCabinetsIntersectHomepageTagAndShopFiltersAndRestoreAll() {
+        let pinkHouse = Brand(name: "PINK HOUSE")
+        let other = Brand(name: "Other")
+        let favorite = Tag(name: "心动")
+        let matching = Clothing(name: "鞋", types: "鞋")
+        matching.brand = pinkHouse
+        matching.tags = [favorite]
+        let wrongShop = Clothing(name: "包", types: "包")
+        wrongShop.brand = other
+        wrongShop.tags = [favorite]
+        let wrongTag = Clothing(name: "帽", types: "小物")
+        wrongTag.brand = pinkHouse
+        let items = [matching, wrongShop, wrongTag]
+        let config = ClothingFilterService.FilterConfig(selectedTagIDs: [favorite.id], selectedBrandIDs: [pinkHouse.id])
+        let filtered = ClothingFilterService.filter(items, config: config)
+        let entries = WardrobeStorageInventory.entries(clothings: filtered)
+        XCTAssertEqual(entries.compactMap { $0.clothing?.id }, [matching.id])
+        XCTAssertEqual(entries.reduce(0) { $0 + $1.quantity }, max(matching.stock, 1))
+        XCTAssertEqual(WardrobeStorageInventory.entries(clothings: ClothingFilterService.filter(items, config: .init())).count, 3)
+        XCTAssertTrue(ClothingFilterService.filter(items, config: .init(selectedBrandIDs: [UUID()])).isEmpty)
+    }
+
+    func testShopPriorityGroupsOtherShopsAndMatchesHomepageEngine() {
+        let pinkHouse = Brand(name: "PINK HOUSE")
+        let alice = Brand(name: "Alice")
+        let baby = Brand(name: "Baby")
+        func dress(_ name: String, _ shop: Brand?, _ time: TimeInterval) -> Clothing {
+            let item = Clothing(name: name, types: "JSK")
+            item.brand = shop
+            item.createdAt = Date(timeIntervalSince1970: time)
+            return item
+        }
+        let pinkOld = dress("P旧", pinkHouse, 1)
+        let pinkNew = dress("P新", pinkHouse, 2)
+        let aliceOld = dress("A旧", alice, 3)
+        let aliceNew = dress("A新", alice, 5)
+        let babyDress = dress("B", baby, 4)
+        let unknown = dress("无店家", nil, 6)
+        let items = [unknown, babyDress, pinkOld, aliceOld, pinkNew, aliceNew]
+        let expected = [pinkNew, pinkOld, aliceNew, aliceOld, babyDress, unknown].map(\.id)
+        XCTAssertEqual(ClothingFilterService.sortByBrand(items, preferredBrandID: pinkHouse.id.uuidString).map(\.id), expected)
+        let input = WardrobeFilterInput(snapshots: items.map(WardrobeClothingSnapshot.init(clothing:)),
+                                       searchText: "", selectedTagIDs: [], selectedBrandIDs: [],
+                                       selectedTypes: [], selectedColors: [], selectedSizes: [],
+                                       selectedLengths: [], selectedConditions: [], selectedAccessories: [],
+                                       depositStatusFilterRawValue: "all", preferredBrandID: pinkHouse.id.uuidString,
+                                       sortOptionRawValue: SortOption.brand.rawValue)
+        XCTAssertEqual(WardrobeFilterEngine.evaluate(input).ids, expected)
+        let alphabetical = ClothingFilterService.sortByBrand(items, preferredBrandID: "").map(\.id)
+        XCTAssertEqual(alphabetical, [aliceNew, aliceOld, babyDress, pinkNew, pinkOld, unknown].map(\.id))
+        XCTAssertEqual(ClothingFilterService.sortByBrand(items, preferredBrandID: UUID().uuidString).map(\.id), alphabetical)
+    }
+
+    func testPreparedIndexMatchesLiveFiltersAcrossShopTagAndStatusCombinations() {
+        let shop = Brand(name: "仲夏物语")
+        let tag = Tag(name: "心动")
+        let dress = Clothing(name: "裙", types: "JSK", price: 100)
+        dress.brand = shop; dress.tags = [tag]
+        let plain = Clothing(name: "无标签", types: "OP", price: 80)
+        let reserved = Clothing(name: "预约裙", types: "JSK", price: 200, isDepositPlan: true)
+        reserved.brand = shop
+        let shoes = Clothing(name: "鞋", types: "鞋")
+        shoes.brand = shop; shoes.tags = [tag]
+        let items = [dress, plain, reserved, shoes]
+        let values = items.map(WardrobeClothingSnapshot.init(clothing:))
+        let index = WardrobeFilterIndex(snapshots: values, cabinets: [])
+        for status in DepositStatusFilter.allCases {
+            for brands: Set<UUID> in [[], [shop.id], [ClothingFilterService.noBrandUUID], [UUID()]] {
+                for tags: Set<UUID> in [[], [tag.id], [ClothingFilterService.noTagUUID]] {
+                    let live = ClothingFilterService.filter(items, config: .init(
+                        selectedTagIDs: tags, selectedBrandIDs: brands, depositStatusFilter: status))
+                        .filter { WardrobeStorageCategory.classify(name: $0.name, types: $0.types) == .wardrobe }
+                    let input = WardrobeFilterInput(snapshots: [], searchText: "", selectedTagIDs: tags,
+                        selectedBrandIDs: brands, selectedTypes: [], selectedColors: [], selectedSizes: [],
+                        selectedLengths: [], selectedConditions: [], selectedAccessories: [],
+                        depositStatusFilterRawValue: status.rawValue, sortOptionRawValue: "添加时间从晚到早")
+                    XCTAssertEqual(Set(WardrobeFilterEngine.evaluate(input, index: index).ids), Set(live.map(\.id)))
+                }
+            }
+        }
+        // Editing relationships must be reflected after invalidating/rebuilding the value index.
+        dress.brand = nil
+        let refreshed = WardrobeFilterIndex(snapshots: items.map(WardrobeClothingSnapshot.init(clothing:)), cabinets: [])
+        XCTAssertEqual(Set(refreshed.candidates(brandIDs: [shop.id], tagIDs: []).map(\.id)), [reserved.id])
+        XCTAssertEqual(Set(index.candidates(brandIDs: [shop.id], tagIDs: []).map(\.id)), [dress.id, reserved.id])
+    }
+
 }

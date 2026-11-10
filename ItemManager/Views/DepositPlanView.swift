@@ -85,6 +85,7 @@ struct DepositPlanView: View {
     let selectedAccessories: Set<String>
     
     // Sort option - stored to apply sorting manually since @Query doesn't update dynamically
+    @AppStorage("UserPreference_PreferredBrandID") private var preferredBrandID = ""
     let sortOption: SortOption
     let onSelectClothing: (Clothing) -> Void
     
@@ -157,6 +158,7 @@ struct DepositPlanView: View {
         [
             searchText,
             sortOption.rawValue,
+            preferredBrandID,
             selectedTagIDs.map(\.uuidString).sorted().joined(separator: ","),
             selectedBrandIDs.map(\.uuidString).sorted().joined(separator: ","),
             selectedTypes.sorted().joined(separator: ","),
@@ -248,6 +250,8 @@ struct DepositPlanView: View {
         // so we need to sort here explicitly
         let sortedResult: [Clothing]
         switch sortOption {
+        case .brand:
+            sortedResult = ClothingFilterService.sortByBrand(result, preferredBrandID: preferredBrandID)
         case .custom:
             sortedResult = result.sorted { $0.sortIndex < $1.sortIndex }
         case .priceAsc:

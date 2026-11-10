@@ -19,6 +19,12 @@ private struct WardrobeClothingRevision: Hashable {
     let reservationKind: ClothingReservationKind
 }
 
+private struct WardrobeFilterNamedRevision: Hashable {
+    let id: UUID
+    let name: String
+    let lastModified: Date
+}
+
 private struct WardrobeFilterSignature: Hashable {
     let searchText: String
     let selectedTagIDs: [UUID]
@@ -30,8 +36,10 @@ private struct WardrobeFilterSignature: Hashable {
     let selectedConditions: [String]
     let selectedAccessories: [String]
     let depositStatusFilterRawValue: String
+    let preferredBrandID: String
     let sortOptionRawValue: String
     let clothingRevisions: [WardrobeClothingRevision]
+    let namedRevisions: [WardrobeFilterNamedRevision]
     let storageCabinets: [WardrobeStorageCustomCabinet]
 
     init(
@@ -46,7 +54,9 @@ private struct WardrobeFilterSignature: Hashable {
         selectedAccessories: Set<String>,
         depositStatusFilterRawValue: String,
         sortOptionRawValue: String,
+        preferredBrandID: String = "",
         clothingRevisions: [WardrobeClothingRevision],
+        namedRevisions: [WardrobeFilterNamedRevision],
         storageCabinets: [WardrobeStorageCustomCabinet] = []
     ) {
         self.searchText = searchText
@@ -60,6 +70,8 @@ private struct WardrobeFilterSignature: Hashable {
         self.selectedAccessories = selectedAccessories.sorted()
         self.depositStatusFilterRawValue = depositStatusFilterRawValue
         self.sortOptionRawValue = sortOptionRawValue
+        self.preferredBrandID = preferredBrandID
+        self.namedRevisions = namedRevisions
         self.clothingRevisions = clothingRevisions
         self.storageCabinets = storageCabinets
     }
@@ -134,6 +146,7 @@ struct WardrobeFilterInput: Sendable {
     let selectedConditions: Set<String>
     let selectedAccessories: Set<String>
     let depositStatusFilterRawValue: String
+    var preferredBrandID: String = ""
     let sortOptionRawValue: String
     var storageCabinets: [WardrobeStorageCustomCabinet] = []
 }
@@ -158,6 +171,61 @@ struct WardrobeFilterResult: Sendable {
     let conditionOptions: [String]
 }
 
+/// 品牌和标签索引只保存值，切换条件时不再读取 SwiftData 关系。
+struct WardrobeFilterIndex: Sendable {
+    let snapshots: [WardrobeClothingSnapshot]
+    private let brands: [UUID: Set<Int>]
+    private let tags: [UUID: Set<Int>]
+    private static let noBrand = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    private static let noTag = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+    nonisolated init(snapshots: [WardrobeClothingSnapshot], cabinets: [WardrobeStorageCustomCabinet]) {
+        self.snapshots = snapshots.filter {
+            !$0.isDeleted && $0.deletedAt == nil &&
+            WardrobeStorageCategory.destination(clothingID: $0.id, name: $0.name, types: $0.types,
+                accessories: $0.accessories, customCabinets: cabinets).id == WardrobeStorageCategory.wardrobe.rawValue
+        }
+        var brands: [UUID: Set<Int>] = [:]
+        var tags: [UUID: Set<Int>] = [:]
+        for (offset, snapshot) in self.snapshots.enumerated() {
+            brands[snapshot.brandID ?? Self.noBrand, default: []].insert(offset)
+            for tag in snapshot.tagIDs.isEmpty ? [Self.noTag] : Array(snapshot.tagIDs) {
+                tags[tag, default: []].insert(offset)
+            }
+        }
+        self.brands = brands
+        self.tags = tags
+    }
+
+    nonisolated func candidates(brandIDs: Set<UUID>, tagIDs: Set<UUID>) -> [WardrobeClothingSnapshot] {
+        func offsets(_ ids: Set<UUID>, _ index: [UUID: Set<Int>], emptyID: UUID) -> Set<Int>? {
+            guard !ids.isEmpty else { return nil }
+            // 混合旧选项时，“无”仍优先生效。
+            if ids.contains(emptyID) { return index[emptyID] ?? [] }
+            return ids.reduce(into: Set<Int>()) { $0.formUnion(index[$1] ?? []) }
+        }
+        let brandRows = offsets(brandIDs, brands, emptyID: Self.noBrand)
+        let tagRows = offsets(tagIDs, tags, emptyID: Self.noTag)
+        let rows: Set<Int>?
+        switch (brandRows, tagRows) {
+        case let (.some(a), .some(b)): rows = a.intersection(b)
+        case let (.some(a), .none): rows = a
+        case let (.none, .some(b)): rows = b
+        default: rows = nil
+        }
+        // 保留相同排序值的原始顺序。
+        return rows.map { $0.sorted().map { snapshots[$0] } } ?? snapshots
+    }
+}
+
+private struct WardrobeProjectionCache {
+    let revisions: [WardrobeClothingRevision]
+    let namedRevisions: [WardrobeFilterNamedRevision]
+    let cabinets: [WardrobeStorageCustomCabinet]
+    let index: WardrobeFilterIndex
+    let clothingByID: [UUID: Clothing]
+}
+
 enum WardrobeFilterEngine {
     /// 编辑中的拖动顺序保留，筛掉的记录移除，新出现的记录按筛选顺序补入。
     nonisolated static func displayOrder(existingIDs: [UUID], filteredIDs: [UUID]) -> [UUID] {
@@ -166,17 +234,13 @@ enum WardrobeFilterEngine {
         return (existingIDs + filteredIDs).filter { allowed.contains($0) && seen.insert($0).inserted }
     }
 
-    nonisolated static func evaluate(_ input: WardrobeFilterInput) -> WardrobeFilterResult {
+    nonisolated static func evaluate(_ input: WardrobeFilterInput, index: WardrobeFilterIndex? = nil) -> WardrobeFilterResult {
         if Task.isCancelled {
             return WardrobeFilterResult(ids: [], stats: .empty, conditionOptions: ClothingCondition.options)
         }
 
-        let homeSnapshots = input.snapshots.filter {
-            !$0.isDeleted && $0.deletedAt == nil &&
-            WardrobeStorageCategory.destination(clothingID: $0.id, name: $0.name, types: $0.types, accessories: $0.accessories,
-                customCabinets: input.storageCabinets).id == WardrobeStorageCategory.wardrobe.rawValue
-        }
-        var result = homeSnapshots
+        let prepared = index ?? WardrobeFilterIndex(snapshots: input.snapshots, cabinets: input.storageCabinets)
+        var result = prepared.candidates(brandIDs: input.selectedBrandIDs, tagIDs: input.selectedTagIDs)
         let query = input.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !query.isEmpty {
@@ -184,8 +248,6 @@ enum WardrobeFilterEngine {
         }
 
         result = result.filter { snapshot in
-            matchesTag(snapshot, selectedTagIDs: input.selectedTagIDs) &&
-            matchesBrand(snapshot, selectedBrandIDs: input.selectedBrandIDs) &&
             matchesStringField(snapshot.types, selectedValues: input.selectedTypes, emptyMarker: "__NO_TYPE__") &&
             matchesStringField(snapshot.colors, selectedValues: input.selectedColors, emptyMarker: "__NO_COLOR__") &&
             matchesStringField(snapshot.sizes, selectedValues: input.selectedSizes, emptyMarker: "__NO_SIZE__") &&
@@ -195,14 +257,13 @@ enum WardrobeFilterEngine {
             matchesDepositStatus(snapshot, rawValue: input.depositStatusFilterRawValue)
         }
 
-        result = sorted(result, sortOptionRawValue: input.sortOptionRawValue)
+        result = sorted(result, sortOptionRawValue: input.sortOptionRawValue, preferredBrandID: input.preferredBrandID)
         let stats = statsSummary(for: result)
-        let conditionOptions = conditionOptions(from: homeSnapshots)
 
         return WardrobeFilterResult(
             ids: result.map(\.id),
             stats: stats,
-            conditionOptions: conditionOptions
+            conditionOptions: ClothingCondition.options
         )
     }
 
@@ -248,30 +309,6 @@ enum WardrobeFilterEngine {
         return nil
     }
 
-    private nonisolated static func matchesTag(_ snapshot: WardrobeClothingSnapshot, selectedTagIDs: Set<UUID>) -> Bool {
-        let noTagUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-        if selectedTagIDs.isEmpty {
-            return true
-        } else if selectedTagIDs.contains(noTagUUID) {
-            return snapshot.tagIDs.isEmpty
-        } else {
-            return !selectedTagIDs.isDisjoint(with: snapshot.tagIDs)
-        }
-    }
-
-    private nonisolated static func matchesBrand(_ snapshot: WardrobeClothingSnapshot, selectedBrandIDs: Set<UUID>) -> Bool {
-        let noBrandUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-        if selectedBrandIDs.isEmpty {
-            return true
-        } else if selectedBrandIDs.contains(noBrandUUID) {
-            return snapshot.brandID == nil
-        } else if let brandID = snapshot.brandID {
-            return selectedBrandIDs.contains(brandID)
-        } else {
-            return false
-        }
-    }
-
     private nonisolated static func matchesStringField(_ value: String, selectedValues: Set<String>, emptyMarker: String) -> Bool {
         if selectedValues.isEmpty {
             return true
@@ -286,8 +323,14 @@ enum WardrobeFilterEngine {
         (DepositStatusFilter(rawValue: rawValue) ?? .all).includes(snapshot.reservationKind)
     }
 
-    private nonisolated static func sorted(_ snapshots: [WardrobeClothingSnapshot], sortOptionRawValue: String) -> [WardrobeClothingSnapshot] {
+    private nonisolated static func sorted(_ snapshots: [WardrobeClothingSnapshot], sortOptionRawValue: String, preferredBrandID: String) -> [WardrobeClothingSnapshot] {
         switch sortOptionRawValue {
+        case "店家排序":
+            return snapshots.sorted {
+                WardrobeBrandOrder.precedes(id: $0.id, brandID: $0.brandID, name: $0.brandName, createdAt: $0.createdAt,
+                                           id: $1.id, brandID: $1.brandID, name: $1.brandName, createdAt: $1.createdAt,
+                                           preferredBrandID: preferredBrandID)
+            }
         case "自定义顺序":
             return snapshots.sorted { $0.sortIndex < $1.sortIndex }
         case "价格从低到高":
@@ -315,10 +358,6 @@ enum WardrobeFilterEngine {
             partial.dressValue += snapshot.dressValueAmount
             partial.totalValue += snapshot.wardrobeValueAmount
         }
-    }
-
-    private nonisolated static func conditionOptions(from snapshots: [WardrobeClothingSnapshot]) -> [String] {
-        ClothingCondition.options
     }
 
     private nonisolated static func splitValues(_ string: String) -> Set<String> {
@@ -530,14 +569,16 @@ struct WardrobeView: View {
     @Environment(ThemeManager.self) private var themeManager
     @Environment(\.colorScheme) private var colorScheme
     @Query private var clothings: [Clothing]
+    @Query private var filterBrands: [Brand]
+    @Query private var filterTags: [Tag]
     @SceneStorage("WardrobeView.showStats") private var showStats = true
     @State private var hasShownStatsRulePrompt = false
     @State private var isShowingStatsRuleHint = false
     @State private var statsRuleHintTask: Task<Void, Never>?
     @State private var cachedFilteredClothings: [Clothing] = []
+    @State private var projectionCache: WardrobeProjectionCache?
     @State private var cellSnapshotCache: [UUID: WardrobeCellSnapshot] = [:]
     @State private var cachedFilteredStatsSummary: WardrobeStatsSummary = .empty
-    @State private var cachedFilterSignature: WardrobeFilterSignature?
     @State private var conditionBatchOptionsCache: [String] = ClothingCondition.options
     @State private var cachedGridColumns: [GridItem]
     @State private var cachedWardrobeThemeDescriptor: ThemeSkinDescriptor?
@@ -599,6 +640,7 @@ struct WardrobeView: View {
     
     // Layout
     let viewLayout: HomeView.ViewLayout
+    @AppStorage("UserPreference_PreferredBrandID") private var preferredBrandID = ""
     let sortOption: SortOption
     
     // Filter properties
@@ -622,11 +664,10 @@ struct WardrobeView: View {
 
     private var filteredStatsSummary: WardrobeStatsSummary {
         let displayed = filteredClothings
-        guard cachedFilterSignature == filterSignature,
-              displayed.count == cachedFilteredClothings.count else {
-            return WardrobeFilterEngine.statsSummary(for: displayed.map(WardrobeClothingSnapshot.init(clothing:)))
-        }
-        return cachedFilteredStatsSummary
+        guard displayed.count != cachedFilteredClothings.count else { return cachedFilteredStatsSummary }
+        // 状态切换先收窄旧结果，统计复用值快照。
+        let ids = Set(displayed.map(\.id))
+        return WardrobeFilterEngine.statsSummary(for: projectionCache?.index.snapshots.filter { ids.contains($0.id) } ?? [])
     }
 
     private var displayedEditableClothings: [Clothing] {
@@ -657,7 +698,7 @@ struct WardrobeView: View {
         self.sortOption = sortOption
         var descriptor = FetchDescriptor<Clothing>(predicate: #Predicate<Clothing> { $0.deletedAt == nil },
                                                   sortBy: sortOption.sortDescriptors)
-        descriptor.relationshipKeyPathsForPrefetching = [\Clothing.accessoryItems]
+        descriptor.relationshipKeyPathsForPrefetching = [\Clothing.accessoryItems, \Clothing.brand, \Clothing.tags]
         _clothings = Query(descriptor)
         self.viewLayout = viewLayout
         _cachedGridColumns = State(initialValue: Self.makeGridColumns(for: viewLayout))
@@ -886,6 +927,7 @@ struct WardrobeView: View {
             selectedAccessories: selectedAccessories,
             depositStatusFilterRawValue: depositStatusFilter.rawValue,
             sortOptionRawValue: sortOption.rawValue,
+            preferredBrandID: preferredBrandID,
             clothingRevisions: clothings.map { clothing in
                 WardrobeClothingRevision(
                     id: clothing.id,
@@ -896,6 +938,8 @@ struct WardrobeView: View {
                     reservationKind: clothing.reservationKind
                 )
             },
+            namedRevisions: filterBrands.map { WardrobeFilterNamedRevision(id: $0.id, name: $0.name, lastModified: $0.lastModified) } +
+                filterTags.map { WardrobeFilterNamedRevision(id: $0.id, name: $0.name, lastModified: $0.lastModified) },
             storageCabinets: storageSettings.cabinets
         )
     }
@@ -1006,7 +1050,7 @@ struct WardrobeView: View {
                 resetStatsScrollState(expand: false)
             }
             .task(id: filterSignature) {
-                await rebuildFilteredClothings(debounceIfWarm: true)
+                await rebuildFilteredClothings()
             }
             .onChange(of: currentWardrobeCellThemeInputs) { _, newValue in
                 wardrobeCellThemeInputs = newValue
@@ -2511,12 +2555,8 @@ struct WardrobeView: View {
     }
 
     @MainActor
-    private func rebuildFilteredClothings(debounceIfWarm: Bool = false) async {
-        if debounceIfWarm, !filteredClothings.isEmpty {
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-        }
-
+    private func rebuildFilteredClothings() async {
+        guard !Task.isCancelled else { return }
         let interval = PerformanceSignpost.wardrobeRebuild(count: clothings.count, reason: "filterSignature")
         defer {
             PerformanceSignpost.end(interval, detail: "filtered=\(filteredClothings.count)")
@@ -2531,15 +2571,40 @@ struct WardrobeView: View {
         }
 
         let signature = filterSignature
-        let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
-        let snapshots = displayClothings.map(WardrobeClothingSnapshot.init(clothing:))
-        var cellSnapshots: [UUID: WardrobeCellSnapshot] = [:]
-        cellSnapshots.reserveCapacity(displayClothings.count)
-        for clothing in displayClothings {
-            cellSnapshots[clothing.id] = WardrobeCellSnapshot(clothing: clothing)
+        let projection: WardrobeProjectionCache
+        let sourceChanged = projectionCache?.revisions != signature.clothingRevisions ||
+            projectionCache?.namedRevisions != signature.namedRevisions ||
+            projectionCache?.cabinets != signature.storageCabinets
+        if !sourceChanged, let cached = projectionCache {
+            projection = cached
+        } else {
+            let displayClothings = deduplicatedClothingsForDisplay(from: clothings)
+            var snapshots: [WardrobeClothingSnapshot] = []
+            snapshots.reserveCapacity(displayClothings.count)
+            var clothingByID: [UUID: Clothing] = [:]
+            clothingByID.reserveCapacity(displayClothings.count)
+            for (offset, clothing) in displayClothings.enumerated() {
+                guard !Task.isCancelled else { return }
+                snapshots.append(WardrobeClothingSnapshot(clothing: clothing))
+                clothingByID[clothing.id] = clothing
+                if offset % 64 == 63 { await Task.yield() }
+            }
+            let cabinets = signature.storageCabinets
+            let values = snapshots
+            let preparation = Task.detached(priority: .userInitiated) {
+                WardrobeFilterIndex(snapshots: values, cabinets: cabinets)
+            }
+            let index = await withTaskCancellationHandler {
+                await preparation.value
+            } onCancel: { preparation.cancel() }
+            guard !Task.isCancelled else { return }
+            projection = WardrobeProjectionCache(revisions: signature.clothingRevisions,
+                namedRevisions: signature.namedRevisions,
+                cabinets: cabinets, index: index, clothingByID: clothingByID)
+            projectionCache = projection
         }
         let input = WardrobeFilterInput(
-            snapshots: snapshots,
+            snapshots: [], // 快照由索引持有
             searchText: searchText,
             selectedTagIDs: selectedTagIDs,
             selectedBrandIDs: selectedBrandIDs,
@@ -2550,27 +2615,31 @@ struct WardrobeView: View {
             selectedConditions: selectedConditions,
             selectedAccessories: selectedAccessories,
             depositStatusFilterRawValue: depositStatusFilter.rawValue,
+            preferredBrandID: preferredBrandID,
             sortOptionRawValue: sortOption.rawValue,
             storageCabinets: storageSettings.cabinets
         )
 
-        let result = await Task.detached(priority: .userInitiated) {
-            WardrobeFilterEngine.evaluate(input)
-        }.value
-
+        let index = projection.index
+        let evaluation = Task.detached(priority: .userInitiated) {
+            WardrobeFilterEngine.evaluate(input, index: index)
+        }
+        let result = await withTaskCancellationHandler {
+            await evaluation.value
+        } onCancel: { evaluation.cancel() }
         guard !Task.isCancelled else { return }
 
-        var clothingByID: [UUID: Clothing] = [:]
-        clothingByID.reserveCapacity(displayClothings.count)
-        for clothing in displayClothings {
-            clothingByID[clothing.id] = clothing
-        }
+        let clothingByID = projection.clothingByID
         let resolvedClothings = result.ids.compactMap { clothingByID[$0] }
 
         cachedFilteredClothings = resolvedClothings
+        // 只预建首屏，其余卡片在显示时生成快照。
+        var cellSnapshots = sourceChanged ? [:] : cellSnapshotCache
+        for clothing in resolvedClothings.prefix(initialImagePrefetchLimit) where cellSnapshots[clothing.id] == nil {
+            cellSnapshots[clothing.id] = WardrobeCellSnapshot(clothing: clothing)
+        }
         cellSnapshotCache = cellSnapshots
         cachedFilteredStatsSummary = result.stats
-        cachedFilterSignature = signature
         conditionBatchOptionsCache = result.conditionOptions
         prefetchInitialWardrobeImages(resolvedClothings, snapshots: cellSnapshots)
 
