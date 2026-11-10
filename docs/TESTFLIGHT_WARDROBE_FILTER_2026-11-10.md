@@ -2,6 +2,8 @@
 
 日期：2026-11-10（Asia/Shanghai）。
 
+后续用户要求纳入全部功能，已生成 [4.4（5）全量候选](TESTFLIGHT_FULL_RELEASE_2026-11-11.md)。本记录的 4.4（4）保留为历史产物，不再用于后续上传。
+
 ## 当前状态
 
 - GitHub：已提交并推送至 `codex/duo-adaptive-navigation`。
